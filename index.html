@@ -1,6 +1,16 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+<script>
+// [진단용, 임시] 자바스크립트 오류가 나면 화면 맨 위에 빨간 띠로 바로 보이게 한다.
+// 원인을 찾은 뒤에는 이 블록은 지워도 된다.
+window.onerror = function(msg, url, line, col, err){
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#d64545;color:#fff;padding:10px;font-size:13px;white-space:pre-wrap;';
+  d.textContent = '⚠ JS 오류: ' + msg + ' (줄 ' + line + ', 칸 ' + col + ')';
+  document.documentElement.appendChild(d);
+};
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>혁신소방 현장테스트 통합 프로토타입 V16</title>
@@ -211,7 +221,7 @@
       <button class="btn-secondary" style="width:auto;margin:0;padding:10px 16px;" id="goConstructionBtn">바로가기</button>
     </div>
     <div class="footer-note">대상물을 고르면 사진대장/불량입력 화면으로 이동합니다. 언제든 우상단 🏠으로 이 화면에 돌아올 수 있습니다.</div>
-    <div class="footer-note" style="color:#bbb;font-size:11px;">빌드: v25_연결배너실제상태반영 · 2026-07-20</div>
+    <div class="footer-note" style="color:#bbb;font-size:11px;">빌드: v26_점검유형별엑셀제목 · 2026-07-22</div>
   </div>
 
   <!-- ================= 불량내역 입력 ================= -->
@@ -337,7 +347,7 @@
     <div id="previewArea">
       <div class="preview-group report" id="previewGroupReport">
         <div class="album-cover">
-          <div style="font-weight:700;font-size:15px;">소방시설 점검 사진대장 (보고서용)</div>
+          <div style="font-weight:700;font-size:15px;" id="previewTitle">소방시설 점검 사진대장 (보고서용)</div>
           <div style="font-size:12px;color:var(--muted);margin-top:6px;" id="previewBuilding">대상명 :</div>
           <div style="font-size:12px;color:var(--muted);margin-top:2px;" id="previewDate"></div>
         </div>
@@ -2993,6 +3003,15 @@ async function generateAlbumXlsx({ title, subjectName, headerLabel, pairs, filen
   }
 }
 
+// [v26 신규] 홈 화면 대상물 목록(SAMPLE_BUILDINGS)의 sub 문구("종합점검 · 07-20 예정" 등)에서
+// 점검유형(종합/작동)을 뽑아온다. 점검사진대장 엑셀 표지 제목을 여기에 맞춰 다르게 낸다.
+function getInspectTypeLabel(building){
+  const b = SAMPLE_BUILDINGS.find(x=>x.name===building);
+  if(b && b.sub && b.sub.indexOf('작동점검')===0) return '작동';
+  if(b && b.sub && b.sub.indexOf('종합점검')===0) return '종합';
+  return '종합'; // 목록에 없는 대상물(직접입력)은 기존과 동일하게 안전하게 '종합'으로 처리
+}
+
 $('photoExportXlsxBtn').onclick = async ()=>{
   // [v22 버그수정] 다른 대상물 사진까지 엑셀에 섞여 들어가지 않도록 currentBuilding으로 필터링
   const selected = sortByTagOrder(
@@ -3003,7 +3022,7 @@ $('photoExportXlsxBtn').onclick = async ()=>{
   const pairs = [];
   for(let i=0;i<selected.length;i+=2) pairs.push(selected.slice(i,i+2));
   await generateAlbumXlsx({
-    title: '소방시설 종합점검 사진대장',
+    title: `소방시설 ${getInspectTypeLabel(currentBuilding)}점검 사진대장`,
     subjectName: currentBuilding,
     headerLabel: '점 검   사 진',
     pairs,
@@ -3536,6 +3555,7 @@ $('previewBtn').onclick = ()=>{
   const reportSel = sortByTagOrder(selected.filter(e=>(e.group||'report')==='report'), TAGS);
   const otherSel = selected.filter(e=>e.group==='other');
 
+  $('previewTitle').textContent = `소방시설 ${getInspectTypeLabel(currentBuilding)}점검 사진대장 (보고서용)`;
   $('previewBuilding').textContent = '대상명 : ' + (currentBuilding || '(미입력)');
   $('previewDate').textContent = new Date().toLocaleDateString('ko-KR');
   const grid = $('previewGrid'); grid.innerHTML='';
