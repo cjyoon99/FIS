@@ -2278,21 +2278,39 @@ async function parseDefectXlsx(file){
   }
   return rows;
 }
+// 엑셀의 "설비명"(예: 옥내소화전설비, 자동화재탐지설비 같은 대분류 표기)을 앱 내부 칩 이름
+// (예: 옥내소화전, 수신기)으로 바꿔둔다. 이렇게 해두면 나중에 엑셀로 다시 내보낼 때, 수동으로
+// 입력한 항목과 완전히 동일한 방식(resolveEquipPrimary → EQUIP_MASTER_INFO)으로 비고(NFTC)와
+// 설비명 열이 자동으로 채워진다 — 즉 비고란을 따로 저장해둘 필요 없이 기존 로직 그대로 재사용.
+// 같은 NFTC/공식명으로 묶이는 칩이 여러 개(예: 자동화재탐지설비 = 수신기/발신기/감지기...)면
+// 그중 아무거나 대표로 골라도 NFTC 번호와 "설비명" 출력 결과는 동일하다.
+function equipTextToChipName(rawText){
+  const norm = (rawText||'').replace(/\s/g,'');
+  if(!norm) return rawText;
+  if(EQUIP_MASTER_INFO[norm]) return norm; // 방화문/방화셔터처럼 이미 칩 이름 그대로인 경우
+  if(!equipTextToChipName._map){
+    const map = {};
+    for(const key of Object.keys(EQUIP_MASTER_INFO)){
+      const officialName = (EQUIP_MASTER_INFO[key][2] || key).replace(/\s/g,'');
+      if(!map[officialName]) map[officialName] = key; // 먼저 나온 것을 대표로 채택(어차피 NFTC 동일)
+    }
+    equipTextToChipName._map = map;
+  }
+  return equipTextToChipName._map[norm] || rawText;
+}
 function buildEntriesFromXlsxRows(rows){
   return rows.map((r,i)=>{
-    // 보완대책(예: "소화기교체요함")은 앱의 조치결과(조치요함/조치완료/확인필요) 값과 성격이 달라
-    // 그대로 매핑하지 않고, 불량내용 뒤에 참고용으로 붙여 정보 손실 없이 남긴다.
-    const defectContent = r.action ? `${r.content} (보완대책: ${r.action})` : r.content;
     return {
       id: Date.now()+'-'+i+'-'+Math.random().toString(36).slice(2,7),
       building: currentBuilding,
       inspector: inspectorName,
       location: r.location,
       detailLocation: '',
-      equip: r.equip || '(설비명 미상)',
-      defectContent,
+      equip: equipTextToChipName(r.equip) || '(설비명 미상)',
+      defectContent: r.content,
       parentEquip: null,
-      action: '조치요함',
+      // 보완대책 문구("~완료"라고 명시된 경우만 조치완료, 그 외(대부분의 "~요함" 문구)는 조치요함)
+      action: /완료/.test(r.action||'') ? '조치완료' : '조치요함',
       photo: null,
       ts: Date.now()
     };
@@ -2312,7 +2330,7 @@ $('defectXlsxImportInput').onchange = async (e)=>{
   try{ rows = await parseDefectXlsx(file); }
   catch(err){ showToast('엑셀을 읽지 못했습니다: ' + err.message); return; }
   if(!rows.length){ showToast('엑셀에서 불러올 항목을 찾지 못했습니다'); return; }
-  if(!confirm(`"${currentBuilding}" 대상물에 ${rows.length}건을 불러옵니다.\n조치결과는 모두 "조치요함"으로 등록되고, 보완대책은 불량내용 뒤에 참고용으로 붙습니다.\n불러온 뒤 목록에서 개별 수정·삭제할 수 있습니다.\n계속할까요?`)) return;
+  if(!confirm(`"${currentBuilding}" 대상물에 ${rows.length}건을 불러옵니다.\n조치결과는 "완료"라고 적힌 것만 조치완료, 나머지는 모두 조치요함으로 등록됩니다.\n비고(NFTC)는 저장하지 않고, 엑셀로 다시 내보낼 때 기존과 동일한 방식으로 자동 계산됩니다.\n불러온 뒤 목록에서 개별 수정·삭제할 수 있습니다.\n계속할까요?`)) return;
   const entries = buildEntriesFromXlsxRows(rows);
   for(let i=0;i<entries.length;i++){
     defectEntries.push(entries[i]);
