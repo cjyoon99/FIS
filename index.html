@@ -52,6 +52,8 @@ window.onerror = function(msg, url, line, col, err){
   .btn-primary{width:100%;padding:15px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:600;margin-top:14px;cursor:pointer;}
   .btn-primary.green{background:var(--success);}
   .btn-secondary{width:100%;padding:11px;background:#fff;color:var(--text);border:1px solid var(--border);border-radius:10px;font-size:14px;margin-top:8px;cursor:pointer;}
+  .capture-mode-btn{flex:1;padding:11px;border:1px solid var(--accent);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;color:var(--accent);}
+  .capture-mode-btn.active-mode{background:var(--accent);color:#fff;}
   .entry{display:flex;gap:10px;padding:12px;border:1px solid var(--border);border-radius:10px;margin-top:10px;background:#fff;align-items:center;}
   .entry img{width:52px;height:52px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee;}
   .entry .meta{flex:1;min-width:0;}
@@ -227,29 +229,37 @@ window.onerror = function(msg, url, line, col, err){
   <!-- ================= 불량내역 입력 ================= -->
   <div class="view" id="view-defect">
     <div class="card">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+        <span id="defectXlsxImportBtn" style="color:var(--accent);font-weight:700;cursor:pointer;font-size:12px;">📥 엑셀에서 불러오기</span>
+        <input type="file" accept=".xlsx" id="defectXlsxImportInput" style="display:none;">
+      </div>
       <label style="display:flex;justify-content:space-between;align-items:center;">
-        <span>위치 (동 · 층)</span>
+        <span>위치 (동 · 층 · 상세위치)</span>
         <span>
-          <span id="locSetDefaultBtn" style="color:var(--brand);cursor:pointer;margin-right:14px;">★ 이 위치를 기본값으로</span>
-          <span id="locAddToggle">+ 동/층 추가</span>
+          <span id="locSetDefaultBtn" style="color:var(--accent);cursor:pointer;margin-right:14px;">★ 기본값으로</span>
+          <span id="locAddToggle">⚙ 위치 관리</span>
         </span>
       </label>
-      <div style="display:flex;gap:8px;">
-        <select id="wingSelect" style="flex:1;"></select>
-        <button type="button" id="wingEditBtn" class="btn-secondary" style="width:auto;padding:0 12px;" title="동 이름 오탈자/오류 수정">✎</button>
-        <select id="floorSelect" style="flex:1;"></select>
-        <button type="button" id="floorEditBtn" class="btn-secondary" style="width:auto;padding:0 12px;" title="층 이름 오탈자/오류 수정">✎</button>
-      </div>
-      <div class="loc-add-row" id="locAddRow" style="display:none;">
-        <input type="text" id="newWingInput" placeholder="새 동 이름(예: 별관동, 없으면 비움)">
-        <input type="text" id="newFloorInput" placeholder="새 층(예: 4F)">
-        <button type="button" id="locAddCommitBtn">추가</button>
-      </div>
-
-      <label>상세 위치</label>
+      <!-- [v27] 동 드롭박스 + 층 드롭박스를 매번 2번 클릭하던 것을, 동·층을 합친 드롭박스 1번 클릭 + 그 옆 상세위치 입력으로 축소 -->
       <div style="display:flex;gap:6px;">
+        <select id="locCombinedSelect" style="flex:1.3;"></select>
         <input type="text" id="detailLocation" placeholder="예: 3-2반 옆" style="flex:1;">
-        <button type="button" id="micBtn" style="width:46px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:17px;cursor:pointer;">🎤</button>
+        <button type="button" id="micBtn" style="width:44px;flex-shrink:0;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:17px;cursor:pointer;">🎤</button>
+      </div>
+      <!-- 동/층 실제 값은 이 숨김 select 2개가 계속 들고 있음(기존 저장 로직 호환용). 화면엔 노출 안 함 -->
+      <select id="wingSelect" style="display:none;"></select>
+      <select id="floorSelect" style="display:none;"></select>
+
+      <div id="locAdvancedPanel" style="display:none;">
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button type="button" id="wingEditBtn" class="btn-secondary" style="flex:1;margin:0;font-size:12px;" title="동 이름 오탈자/오류 수정">✎ 동 이름 수정</button>
+          <button type="button" id="floorEditBtn" class="btn-secondary" style="flex:1;margin:0;font-size:12px;" title="층 이름 오탈자/오류 수정">✎ 층 이름 수정</button>
+        </div>
+        <div class="loc-add-row" id="locAddRow">
+          <input type="text" id="newWingInput" placeholder="새 동 이름(예: 별관동, 없으면 비움)">
+          <input type="text" id="newFloorInput" placeholder="새 층(예: 4F)">
+          <button type="button" id="locAddCommitBtn">추가</button>
+        </div>
       </div>
 
       <label>소방시설명 <span style="font-weight:400;color:var(--muted);">(과거 불량이력 빈도순 · 칩을 눌러 끌면 순서 변경, 직접 추가한 항목은 구분선 뒤에 표시)</span></label>
@@ -308,6 +318,11 @@ window.onerror = function(msg, url, line, col, err){
   <!-- ================= 점검 사진대장 ================= -->
   <div class="view" id="view-photolog">
     <div class="card">
+      <label style="margin:0 0 6px;">사진 등록 방식</label>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <button type="button" id="captureModeCameraBtn" class="capture-mode-btn">📷 촬영</button>
+        <button type="button" id="captureModeLibraryBtn" class="capture-mode-btn">🖼 사진함에서 선택</button>
+      </div>
       <label style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 4px;">
         <span>보고서용 태그 <span style="font-weight:400;color:var(--muted);">(탭하면 그 항목으로 바로 촬영됩니다)</span></span>
         <span id="tagManageBtn" style="color:var(--accent);font-weight:700;cursor:pointer;font-size:12px;">⚙ 태그 편집</span>
@@ -365,14 +380,15 @@ window.onerror = function(msg, url, line, col, err){
       </div>
     </div>
 
-    <!-- ================= 공사 사진 대장 (점검 일정과 무관, 사진대장 화면 맨 아래로 통합) ================= -->
+    <!-- ================= 공사 사진 대장 (점검 일정과는 무관하지만, [v27] 대상물별로는 구분해 기록) ================= -->
     <div class="section-divider" style="margin-top:24px;border-top:2px dashed var(--border);padding-top:18px;">
-      <div class="section-label" style="margin-top:0;">🔧 공사(정비) 사진 대장 <span style="font-weight:400;color:var(--muted);font-size:12px;">(점검 일정·대상물 선택과 무관하게 독립 기록)</span></div>
+      <div class="section-label" style="margin-top:0;">🔧 공사(정비) 사진 대장 <span style="font-weight:400;color:var(--muted);font-size:12px;">(점검 일정과 무관하게 독립 기록 · 대상물별로 구분)</span></div>
       <div class="card">
-        <label>공사(현장) 명</label>
-        <input type="text" id="constructionSiteName" placeholder="예: 양지초등학교 옥내소화전 개폐밸브 교체공사">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">대상물 : <b id="constructionBuildingLabel" style="color:var(--text);">-</b></div>
+        <label>공사명</label>
+        <input type="text" id="constructionSiteName" placeholder="예: 옥내소화전 개폐밸브 교체공사">
 
-        <label>이번 항목명 (무엇을 보수/교체했는지)</label>
+        <label>교체 대상 항목 (무엇을 보수/교체했는지)</label>
         <input type="text" id="constructionItemLabel" placeholder="예: 3층 옥내소화전함 개폐밸브 교체">
 
         <div style="display:flex;gap:10px;margin-top:10px;">
@@ -398,7 +414,7 @@ window.onerror = function(msg, url, line, col, err){
       <div id="constructionEmpty" class="empty">아직 저장된 항목이 없습니다</div>
 
       <button class="btn-secondary" id="constructionExportXlsxBtn">📊 공사 사진 대장 (엑셀)</button>
-      <button class="btn-secondary" id="constructionClearBtn" style="color:var(--danger);">🗑 전체 초기화</button>
+      <button class="btn-secondary" id="constructionClearBtn" style="color:var(--danger);">🗑 이 대상물만 삭제</button>
     </div>
   </div>
 
@@ -1330,6 +1346,7 @@ async function startInspection(name){
   $('detailLocation').value=''; // [v21] 대상물이 바뀌면 상세위치도 초기화(다른 건물의 위치가 남아있으면 안 되므로)
   renderDefectChips();
   loadTags(); // [v14] 대상물이 바뀌면 그 대상물의 설치 설비 기준으로 사진대장 태그를 다시 계산
+  renderConstructionEntries(); // [v27] 공사 사진대장도 대상물별로 구분되므로, 대상물이 바뀌면 다시 그림
   showToast(name + ' 점검 시작');
   // 예전엔 곧장 사진대장(photolog)으로 이동했는데, 이제 대상물만 정하고 어디로 갈지는
   // 4-block(빠른 전환) 화면에서 직접 고르도록 함. 여기서 고른 화면에서도 언제든 ⊞(빠른 전환)을
@@ -1663,15 +1680,16 @@ function renderChipGroup(containerId, items, activeCheck, onClick, extraClass){
 }
 
 // ---- 위치(동/층) 선택 ----
+// [v27] 동 select · 층 select 2개를 각각 클릭하던 것을 하나의 통합 드롭박스(locCombinedSelect)로 바꿈.
+// wingSelect/floorSelect는 화면에서 숨겨진 채 "실제 값을 들고 있는 저장소" 역할만 하고,
+// 기존 저장 로직(불량내역 저장 등)은 그대로 이 두 select의 .value를 읽으므로 수정 범위를 최소화함.
 function renderLocationSelectors(){
   const struct = BUILDING_STRUCTURE[currentBuilding] || BUILDING_STRUCTURE['_default'];
   const wingSel = $('wingSelect'), floorSel = $('floorSelect');
   if(struct.wings.length){
-    wingSel.style.display = '';
     $('wingEditBtn').style.display = '';
     wingSel.innerHTML = struct.wings.map(w=>`<option value="${w}">${w}</option>`).join('');
   } else {
-    wingSel.style.display = 'none';
     $('wingEditBtn').style.display = 'none';
     wingSel.innerHTML = '';
   }
@@ -1684,6 +1702,28 @@ function renderLocationSelectors(){
     if(def.wing && struct.wings.includes(def.wing)) wingSel.value = def.wing;
     if(def.floor && struct.floors.includes(def.floor)) floorSel.value = def.floor;
   }
+  renderCombinedLocationSelect();
+}
+// 동×층 조합을 하나의 드롭박스 옵션으로 만든다 (동이 없는 대상물은 층만 나열)
+function renderCombinedLocationSelect(){
+  const struct = BUILDING_STRUCTURE[currentBuilding] || BUILDING_STRUCTURE['_default'];
+  const combo = $('locCombinedSelect');
+  const wings = struct.wings.length ? struct.wings : [''];
+  const opts = [];
+  wings.forEach(w=>{
+    struct.floors.forEach(f=>{
+      const label = w ? `${w} ${f}` : f;
+      opts.push(`<option value="${w}|${f}">${label}</option>`);
+    });
+  });
+  combo.innerHTML = opts.join('');
+  syncCombinedLocationValue();
+}
+// 숨겨진 wingSelect/floorSelect의 현재 값을 통합 드롭박스에 반영
+function syncCombinedLocationValue(){
+  const w = $('wingSelect').options.length ? $('wingSelect').value : '';
+  const f = $('floorSelect').value;
+  $('locCombinedSelect').value = `${w}|${f}`;
 }
 // [v20 신규] 목록에 있는 동/층 이름 자체가 틀렸을 때(오탈자·오류) 고치는 기능.
 // "기본값으로 저장"과는 다르다 — 그건 목록 중 뭘 기본으로 고를지 정하는 것이고,
@@ -1709,32 +1749,32 @@ function renameLocationValue(kind, oldVal){
   saveUiPrefsDebounced();
   renderLocationSelectors();
   if(kind==='wing') $('wingSelect').value = nv; else $('floorSelect').value = nv;
+  syncCombinedLocationValue();
   showToast(`"${oldVal}" → "${nv}"로 수정했습니다 (팀원과 공유되고, 다음에도 이 이름으로 나옵니다)`);
 }
 $('wingEditBtn').onclick = ()=> renameLocationValue('wing', $('wingSelect').value);
 $('floorEditBtn').onclick = ()=> renameLocationValue('floor', $('floorSelect').value);
 $('locSetDefaultBtn').onclick = ()=>{
   if(!currentBuilding){ showToast('대상물을 먼저 선택해주세요'); return; }
-  const wing = $('wingSelect').style.display==='none' ? '' : $('wingSelect').value;
+  const wing = $('wingSelect').options.length===0 ? '' : $('wingSelect').value;
   const floor = $('floorSelect').value;
   uiPrefs.defaultLocation[currentBuilding] = { wing, floor };
   saveUiPrefsDebounced();
   showToast(`"${[wing,floor].filter(Boolean).join(' ')}"를 ${currentBuilding}의 기본 위치로 저장했습니다 (팀원과 공유됨)`);
 };
-$('wingSelect').onchange = ()=>{
-  // [v21] 사용자가 실제로 동을 바꿨을 때만 상세위치를 비운다. ✎ 오탈자 수정이나 ★ 기본값 저장은
-  // 코드에서 select.value를 직접 바꾸는 것이라 change 이벤트가 발생하지 않아 여기 걸리지 않는다.
-  $('detailLocation').value='';
-  showToast('위치가 바뀌어 상세 위치를 비웠습니다');
-};
-$('floorSelect').onchange = ()=>{
+// [v27] 동 select + 층 select 각각 클릭하던 것을 통합 드롭박스 1번 클릭으로 축소.
+// 값 형식은 "동|층" 이며, 선택 즉시 숨겨진 wingSelect/floorSelect에 반영해 기존 저장 로직과 호환한다.
+$('locCombinedSelect').onchange = ()=>{
+  const [w,f] = $('locCombinedSelect').value.split('|');
+  $('wingSelect').value = w;
+  $('floorSelect').value = f;
   $('detailLocation').value='';
   showToast('위치가 바뀌어 상세 위치를 비웠습니다');
 };
 let locAddOpen = false;
 $('locAddToggle').onclick = ()=>{
   locAddOpen = !locAddOpen;
-  $('locAddRow').style.display = locAddOpen ? 'flex' : 'none';
+  $('locAdvancedPanel').style.display = locAddOpen ? 'block' : 'none';
 };
 $('locAddCommitBtn').onclick = ()=>{
   const w = $('newWingInput').value.trim();
@@ -1752,8 +1792,9 @@ $('locAddCommitBtn').onclick = ()=>{
   renderLocationSelectors();
   if(w) $('wingSelect').value = w;
   if(f) $('floorSelect').value = f;
+  syncCombinedLocationValue();
   $('newWingInput').value=''; $('newFloorInput').value='';
-  $('locAddRow').style.display='none'; locAddOpen=false;
+  locAddOpen=false; $('locAdvancedPanel').style.display='none';
   showToast('추가했습니다. 다음 점검부터 바로 사용할 수 있습니다');
 };
 
@@ -2180,6 +2221,107 @@ async function saveDefectEntry(entry){
   try{ await storageSet('defect:'+entry.id, JSON.stringify(entry), true); }
   catch(e){ showToast('저장 실패 (동기화 안 됨) - 다시 시도해주세요'); }
 }
+// ================= 엑셀 불량내역 역마이그레이션 (v28) =================
+// 참소방_불량내역엑셀_출력규칙에 맞춰 출력된 "소방시설등 시정보완 조치명령 사항" 형태의
+// 엑셀(소방시설/설비명 병합, 위치, 시정보완사항, 보완대책, 비고 열)을 읽어 불량내역으로 되돌려 넣는다.
+async function parseDefectXlsx(file){
+  const buf = await file.arrayBuffer();
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buf);
+  const ws = wb.worksheets[0];
+  if(!ws) throw new Error('시트를 찾을 수 없습니다');
+
+  // '위치'라는 글자가 있는 행을 헤더 행으로 판단
+  let headerRowNum = null;
+  ws.eachRow((row, rowNumber)=>{
+    if(headerRowNum) return;
+    row.eachCell((cell)=>{
+      const v = (cell.value==null?'':cell.value.toString()).replace(/\s/g,'');
+      if(v==='위치') headerRowNum = rowNumber;
+    });
+  });
+  if(!headerRowNum) throw new Error('헤더(위치 열)를 찾지 못했습니다. 양식을 확인해주세요');
+
+  const colMap = {};
+  ws.getRow(headerRowNum).eachCell((cell, colNumber)=>{
+    const v = (cell.value==null?'':cell.value.toString()).replace(/\s/g,'');
+    if(v.includes('소방시설')) colMap.category = colNumber;
+    else if(v.includes('설비명')) colMap.equip = colNumber;
+    else if(v==='위치') colMap.location = colNumber;
+    else if(v.includes('시정보완') || v.includes('시정보수')) colMap.content = colNumber;
+    else if(v.includes('보완대책')) colMap.action = colNumber;
+    else if(v.includes('비고')) colMap.note = colNumber;
+  });
+  if(!colMap.equip || !colMap.location || !colMap.content){
+    throw new Error('엑셀에서 설비명/위치/시정보완사항 열을 찾지 못했습니다. 양식을 확인해주세요');
+  }
+
+  const getCellVal = (row, colNumber)=>{
+    if(!colNumber) return '';
+    const cell = row.getCell(colNumber);
+    const v = cell.isMerged ? cell.master.value : cell.value;
+    return (v==null ? '' : v.toString().trim());
+  };
+
+  const rows = [];
+  let lastCategory='', lastEquip='';
+  for(let r=headerRowNum+1; r<=ws.rowCount; r++){
+    const row = ws.getRow(r);
+    const location = getCellVal(row, colMap.location);
+    const content = getCellVal(row, colMap.content);
+    if(!location && !content) continue; // 빈 행은 건너뜀
+    const category = getCellVal(row, colMap.category) || lastCategory;
+    const equip = getCellVal(row, colMap.equip) || lastEquip;
+    lastCategory = category; lastEquip = equip;
+    const action = getCellVal(row, colMap.action);
+    rows.push({ category, equip, location, content, action });
+  }
+  return rows;
+}
+function buildEntriesFromXlsxRows(rows){
+  return rows.map((r,i)=>{
+    // 보완대책(예: "소화기교체요함")은 앱의 조치결과(조치요함/조치완료/확인필요) 값과 성격이 달라
+    // 그대로 매핑하지 않고, 불량내용 뒤에 참고용으로 붙여 정보 손실 없이 남긴다.
+    const defectContent = r.action ? `${r.content} (보완대책: ${r.action})` : r.content;
+    return {
+      id: Date.now()+'-'+i+'-'+Math.random().toString(36).slice(2,7),
+      building: currentBuilding,
+      inspector: inspectorName,
+      location: r.location,
+      detailLocation: '',
+      equip: r.equip || '(설비명 미상)',
+      defectContent,
+      parentEquip: null,
+      action: '조치요함',
+      photo: null,
+      ts: Date.now()
+    };
+  });
+}
+$('defectXlsxImportBtn').onclick = ()=>{
+  if(!currentBuilding){ showToast('대상물을 먼저 선택해주세요'); return; }
+  if(typeof ExcelJS === 'undefined'){ showToast('엑셀 라이브러리 로드에 실패했습니다. 인터넷 연결을 확인해주세요'); return; }
+  $('defectXlsxImportInput').click();
+};
+$('defectXlsxImportInput').onchange = async (e)=>{
+  const file = e.target.files[0];
+  e.target.value = ''; // 같은 파일을 다시 선택할 수 있도록 초기화
+  if(!file) return;
+  showToast('엑셀을 읽는 중...');
+  let rows;
+  try{ rows = await parseDefectXlsx(file); }
+  catch(err){ showToast('엑셀을 읽지 못했습니다: ' + err.message); return; }
+  if(!rows.length){ showToast('엑셀에서 불러올 항목을 찾지 못했습니다'); return; }
+  if(!confirm(`"${currentBuilding}" 대상물에 ${rows.length}건을 불러옵니다.\n조치결과는 모두 "조치요함"으로 등록되고, 보완대책은 불량내용 뒤에 참고용으로 붙습니다.\n불러온 뒤 목록에서 개별 수정·삭제할 수 있습니다.\n계속할까요?`)) return;
+  const entries = buildEntriesFromXlsxRows(rows);
+  for(let i=0;i<entries.length;i++){
+    defectEntries.push(entries[i]);
+    await saveDefectEntry(entries[i]);
+    if(i%5===0 || i===entries.length-1) showToast(`불러오는 중... (${i+1}/${entries.length})`);
+  }
+  renderDefectEntries();
+  showToast(`${entries.length}건을 불러왔습니다 (팀원과 공유됨)`);
+};
 async function moveEntryToTrash(id){
   const idx = defectEntries.findIndex(en=>en.id===id);
   if(idx===-1) return;
@@ -2377,7 +2519,7 @@ $('defectSaveBtn').onclick = async ()=>{
   const defectContent = $('defectContent').value.trim();
   if(!equip){ showToast('설비명을 선택하거나 입력해주세요'); return; }
   if(!defectContent){ showToast('불량내용을 입력해주세요'); return; }
-  const wing = $('wingSelect').style.display !== 'none' ? $('wingSelect').value : '';
+  const wing = $('wingSelect').options.length !== 0 ? $('wingSelect').value : '';
   const floor = $('floorSelect').value;
   const location = (wing ? wing+' ' : '') + floor;
   const entry = {
@@ -3030,7 +3172,7 @@ $('photoExportXlsxBtn').onclick = async ()=>{
   });
 };
 
-// ================= 공사 사진 대장 (점검 일정과 무관한 독립 기능) =================
+// ================= 공사 사진 대장 (점검 일정과는 무관하지만, [v27] 대상물별로 구분해서 기록) =================
 let constructionEntries = [];
 let constructionBeforePhoto = null;
 let constructionAfterPhoto = null;
@@ -3046,11 +3188,16 @@ async function saveConstructionEntry(entry){
 async function deleteConstructionEntry(id){
   try{ await storageDelete('construction:'+id, true); }catch(e){}
 }
+// [v27] 전체 목록(constructionEntries)은 모든 대상물의 항목을 그대로 들고 있고(다른 대상물 것도
+// 팀원 동기화를 위해 계속 로드해둠), 화면에는 "지금 보고 있는 대상물" 것만 필터링해 보여준다.
+// 불량내역/점검사진대장과 동일한 패턴(entry.building===currentBuilding).
 function renderConstructionEntries(){
-  $('constructionCount').textContent = constructionEntries.length;
+  $('constructionBuildingLabel').textContent = currentBuilding || '(대상물 미선택)';
+  const buildingEntries = constructionEntries.filter(en=>en.building===currentBuilding);
+  $('constructionCount').textContent = buildingEntries.length;
   const list = $('constructionList'); list.innerHTML='';
-  $('constructionEmpty').style.display = constructionEntries.length ? 'none':'block';
-  constructionEntries.slice().reverse().forEach(entry=>{
+  $('constructionEmpty').style.display = buildingEntries.length ? 'none':'block';
+  buildingEntries.slice().reverse().forEach(entry=>{
     const div = document.createElement('div');
     div.className = 'entry';
     div.innerHTML = `
@@ -3091,12 +3238,15 @@ $('constructionAfterInput').onchange = async (e)=>{
   $('constructionAfterPreview').src = constructionAfterPhoto; $('constructionAfterPreview').style.display='block';
 };
 $('constructionSaveBtn').onclick = async ()=>{
+  if(!currentBuilding){ showToast('대상물을 먼저 선택해주세요'); return; }
   const siteName = $('constructionSiteName').value.trim();
   const itemLabel = $('constructionItemLabel').value.trim();
-  if(!siteName){ showToast('공사(현장) 명을 입력해주세요'); return; }
+  if(!siteName){ showToast('공사명을 입력해주세요'); return; }
+  if(!itemLabel){ showToast('교체 대상 항목을 입력해주세요'); return; }
   if(!constructionBeforePhoto && !constructionAfterPhoto){ showToast('작업전/작업후 사진 중 최소 1장은 촬영해주세요'); return; }
   const entry = {
     id: Date.now()+'-'+Math.random().toString(36).slice(2,7),
+    building: currentBuilding,
     siteName, itemLabel,
     beforePhoto: constructionBeforePhoto, afterPhoto: constructionAfterPhoto,
     ts: Date.now()
@@ -3111,9 +3261,11 @@ $('constructionSaveBtn').onclick = async ()=>{
   $('constructionAfterPreview').style.display='none';
 };
 $('constructionExportXlsxBtn').onclick = async ()=>{
-  if(!constructionEntries.length){ showToast('저장된 항목이 없습니다'); return; }
-  const siteName = constructionEntries[constructionEntries.length-1].siteName || '공사현장';
-  const pairs = constructionEntries.map(en=>[
+  if(!currentBuilding){ showToast('대상물을 먼저 선택해주세요'); return; }
+  const buildingEntries = constructionEntries.filter(en=>en.building===currentBuilding);
+  if(!buildingEntries.length){ showToast('이 대상물의 저장된 항목이 없습니다'); return; }
+  const siteName = buildingEntries[buildingEntries.length-1].siteName || currentBuilding || '공사현장';
+  const pairs = buildingEntries.map(en=>[
     en.beforePhoto ? { photo: en.beforePhoto, tag: `${en.itemLabel||''} (작업전)` } : undefined,
     en.afterPhoto ? { photo: en.afterPhoto, tag: `${en.itemLabel||''} (작업후)` } : undefined,
   ]);
@@ -3126,9 +3278,16 @@ $('constructionExportXlsxBtn').onclick = async ()=>{
   });
 };
 $('constructionClearBtn').onclick = async ()=>{
-  if(!confirm('⚠️ 팀 전체와 공유된 공사 사진 대장을 모두 삭제합니다. 다른 작업자의 항목도 함께 지워지며 되돌릴 수 없습니다. 정말 진행할까요?')) return;
-  await Promise.all(constructionEntries.map(en=>deleteConstructionEntry(en.id)));
-  constructionEntries=[]; renderConstructionEntries(); showToast('초기화했습니다');
+  if(!currentBuilding){ showToast('대상물을 먼저 선택해주세요'); return; }
+  // [v27 변경] 예전엔 "전체 초기화"가 모든 대상물의 공사 사진 대장을 통째로 지웠다.
+  // 대상물별로 화면이 분리된 지금은 "지금 보고 있는 대상물" 것만 지우도록 범위를 좁힌다
+  // (불량내역/점검사진대장의 "이 대상물만 삭제"와 동일한 방식).
+  if(!confirm(`⚠️ "${currentBuilding}"의 공사 사진 대장을 팀 전체와 공유된 상태로 삭제합니다. 다른 대상물의 데이터는 그대로 남습니다. 되돌릴 수 없는데 진행할까요?`)) return;
+  const toDelete = constructionEntries.filter(en=>en.building===currentBuilding);
+  await Promise.all(toDelete.map(en=>deleteConstructionEntry(en.id)));
+  constructionEntries = constructionEntries.filter(en=>en.building!==currentBuilding);
+  renderConstructionEntries();
+  showToast(`"${currentBuilding}"의 공사 사진 대장을 삭제했습니다`);
 };
 
 // ================= 점검 사진대장 =================
@@ -3386,6 +3545,34 @@ function getActiveTagInfo(){
   const custom = $('tagCustom').value.trim();
   return { tag: custom || currentTag, group:'report' };
 }
+// [v27] 사진 등록 방식 토글: 기본은 "촬영"(카메라 직행), "사진함에서 선택"을 고르면
+// photoInput의 capture 속성을 떼어내 OS 사진 선택창이 뜨게 한다. 매번 다시 묻지 않도록
+// 선택값을 sessionStorage에 저장해, 12장을 다 등록할 때까지(혹은 사용자가 직접 다시 바꿀 때까지) 유지한다.
+let photoCaptureMode = (function(){
+  try{ return sessionStorage.getItem('_photoCaptureMode') || 'camera'; }catch(e){ return 'camera'; }
+})();
+function applyCaptureMode(){
+  const input = $('photoInput');
+  if(photoCaptureMode==='library'){ input.removeAttribute('capture'); }
+  else { input.setAttribute('capture','environment'); }
+  $('captureModeCameraBtn').classList.toggle('active-mode', photoCaptureMode==='camera');
+  $('captureModeLibraryBtn').classList.toggle('active-mode', photoCaptureMode==='library');
+}
+$('captureModeCameraBtn').onclick = ()=>{
+  if(photoCaptureMode==='camera') return;
+  photoCaptureMode = 'camera';
+  try{ sessionStorage.setItem('_photoCaptureMode','camera'); }catch(e){}
+  applyCaptureMode();
+  showToast('촬영 모드로 전환했습니다');
+};
+$('captureModeLibraryBtn').onclick = ()=>{
+  if(photoCaptureMode==='library') return;
+  photoCaptureMode = 'library';
+  try{ sessionStorage.setItem('_photoCaptureMode','library'); }catch(e){}
+  applyCaptureMode();
+  showToast('사진함에서 선택하는 모드로 전환했습니다. 등록을 마칠 때까지 계속 이 모드가 유지됩니다');
+};
+applyCaptureMode();
 $('tagCustomShootBtn').onclick = ()=>{
   const v = $('tagCustom').value.trim();
   if(!v){ showToast('태그를 입력해주세요'); return; }
