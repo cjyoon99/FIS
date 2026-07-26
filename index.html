@@ -34,7 +34,7 @@ window.onerror = function(msg, url, line, col, err){
   .view.active{display:block;}
   .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;}
   label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;font-weight:600;}
-  input[type=text], textarea{width:100%;font-size:16px;padding:11px;border:1px solid var(--border);border-radius:8px;font-family:inherit;}
+  input[type=text], input[type=date], textarea{width:100%;font-size:16px;padding:11px;border:1px solid var(--border);border-radius:8px;font-family:inherit;}
   select{font-size:16px;padding:11px;border:1px solid var(--border);border-radius:8px;font-family:inherit;background:#fff;flex:1;}
   textarea{min-height:60px;resize:vertical;}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
@@ -194,6 +194,31 @@ window.onerror = function(msg, url, line, col, err){
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<!-- [v40] 업체(테넌트)별 대상물 마스터 DB를 코드로 구분해 동적으로 로드.
+     URL에 ?tenant=업체코드 를 붙이면 그 업체 데이터를, 없으면 기본값(혁신소방)을 불러온다.
+     새 업체가 생기면: (1) 그 업체 데이터 파일을 평소 버전규칙대로 만들어 올리고
+     (2) 아래 TENANT_FILES에 코드 한 줄만 추가하면 된다. 앱 코드(이 html)는 손댈 필요 없음.
+     10개 코드는 미리 뽑아둔 것 — 혁신소방이 1번(7N040I), 나머지 9개는 다음 고객사용으로 비축. -->
+<script>
+  var TENANT_FILES = {
+    '7N040I': { name:'혁신소방',   file:'참소방_대상물마스터_혁신소방_V03_20260725_1630.js' },
+    'ANW4L1': { name:'(미배정)',   file:null },
+    'WWLQVE': { name:'(미배정)',   file:null },
+    '3HGB9N': { name:'(미배정)',   file:null },
+    '1BFVWW': { name:'(미배정)',   file:null },
+    'DTIHP9': { name:'(미배정)',   file:null },
+    '7RJB8S': { name:'(미배정)',   file:null },
+    '8IEF7B': { name:'(미배정)',   file:null },
+    'JN03KB': { name:'(미배정)',   file:null },
+    'AI0XJX': { name:'(미배정)',   file:null }
+  };
+  var DEFAULT_TENANT_CODE = '7N040I'; // 혁신소방
+  var _reqTenant = new URLSearchParams(location.search).get('tenant');
+  var _entry = (_reqTenant && TENANT_FILES[_reqTenant] && TENANT_FILES[_reqTenant].file)
+    ? TENANT_FILES[_reqTenant] : TENANT_FILES[DEFAULT_TENANT_CODE];
+  var CURRENT_TENANT_CODE = (_reqTenant && TENANT_FILES[_reqTenant] && TENANT_FILES[_reqTenant].file) ? _reqTenant : DEFAULT_TENANT_CODE;
+  document.write('<script src="' + _entry.file + '"><\/script>');
+</script>
 </head>
 <body>
 
@@ -213,7 +238,24 @@ window.onerror = function(msg, url, line, col, err){
 
   <!-- ================= 홈 화면 ================= -->
   <div class="view active" id="view-home">
-    <div class="section-label" style="margin-top:0;">내 담당 대상물</div>
+    <div class="section-label" style="margin-top:0;">내 담당 대상물 <span id="addScheduleBtn" style="font-weight:400;color:var(--accent);cursor:pointer;font-size:12px;">+ 새 일정 추가</span></div>
+    <div class="card" id="addScheduleForm" style="display:none;">
+      <label style="margin-top:0;">대상물명</label>
+      <input type="text" id="newBuildingName" placeholder="예: 삼산빌딩 (기존 등록 대상물이면 자동완성)" list="masterBuildingNames">
+      <datalist id="masterBuildingNames"></datalist>
+      <label>점검종류</label>
+      <select id="newBuildingType">
+        <option value="종합점검">종합점검</option>
+        <option value="작동점검" selected>작동점검</option>
+        <option value="월점검">월점검</option>
+      </select>
+      <label>예정일</label>
+      <input type="date" id="newBuildingDate">
+      <div style="display:flex;gap:8px;">
+        <button class="btn-secondary" id="cancelAddBuildingBtn" style="margin-top:14px;">취소</button>
+        <button class="btn-primary" id="confirmAddBuildingBtn" style="margin-top:14px;">추가하기</button>
+      </div>
+    </div>
     <div id="homeList"></div>
     <div class="card" style="margin-top:16px;">
       <label>직접 입력해서 시작</label>
@@ -226,7 +268,7 @@ window.onerror = function(msg, url, line, col, err){
       <button class="btn-secondary" style="width:auto;margin:0;padding:10px 16px;" id="goConstructionBtn">바로가기</button>
     </div>
     <div class="footer-note">대상물을 고르면 사진대장/불량입력 화면으로 이동합니다. 언제든 우상단 🏠으로 이 화면에 돌아올 수 있습니다.</div>
-    <div class="footer-note" style="color:#bbb;font-size:11px;">빌드: v26_점검유형별엑셀제목 · 2026-07-22</div>
+    <div class="footer-note" style="color:#bbb;font-size:11px;">빌드: v40_업체코드멀티테넌트 · 2026-07-24 · 업체: <span id="tenantLabel"></span></div>
   </div>
 
   <!-- ================= 불량내역 입력 ================= -->
@@ -258,11 +300,7 @@ window.onerror = function(msg, url, line, col, err){
           <button type="button" id="wingEditBtn" class="btn-secondary" style="flex:1;margin:0;font-size:12px;" title="동 이름 오탈자/오류 수정">✎ 동 이름 수정</button>
           <button type="button" id="floorEditBtn" class="btn-secondary" style="flex:1;margin:0;font-size:12px;" title="층 이름 오탈자/오류 수정">✎ 층 이름 수정</button>
         </div>
-        <div class="loc-add-row" id="locAddRow">
-          <input type="text" id="newWingInput" placeholder="새 동 이름(예: 별관동, 없으면 비움)">
-          <input type="text" id="newFloorInput" placeholder="새 층(예: 4F)">
-          <button type="button" id="locAddCommitBtn">추가</button>
-        </div>
+        <button type="button" id="structEditBtn" class="btn-secondary" style="width:100%;margin:8px 0 0;font-size:12px;" title="동/층을 통째로 추가·수정·삭제">🏗 동/층 구조 편집 (추가·수정·삭제)</button>
       </div>
 
       <label>소방시설명 <span style="font-weight:400;color:var(--muted);">(과거 불량이력 빈도순 · 칩을 눌러 끌면 순서 변경, 직접 추가한 항목은 구분선 뒤에 표시)</span></label>
@@ -572,6 +610,18 @@ window.onerror = function(msg, url, line, col, err){
   </div>
 </div>
 
+<div class="overlay" id="structOverlay">
+  <div class="sheet" style="max-height:88vh;overflow-y:auto;">
+    <h3 id="structOverlayTitle">동/층 구조 편집</h3>
+    <div class="hint">동마다 한 줄씩, 그 동의 층을 쉼표로 구분해서 입력하세요 (예: 1F,2F,3F). 동 구분이 없는 건물은 이름 칸을 비우고 한 줄만 입력하면 됩니다. ✕로 그 동을 통째로 삭제할 수 있습니다.</div>
+    <div id="structRows"></div>
+    <button type="button" class="btn-secondary" id="structAddRowBtn" style="margin-top:6px;">+ 동 추가</button>
+    <button class="btn-primary" id="structSaveBtn" style="margin-top:14px;">저장 (팀원과 공유됨)</button>
+    <button class="btn-secondary" id="structResetBtn" style="color:var(--danger);margin-top:8px;">↺ 원래(자동 연동) 값으로 되돌리기</button>
+    <button class="sheet-close" id="structClose">닫기</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -669,7 +719,7 @@ async function storageGetMany(prefix, shared){
 }
 
 // ---- UI 커스터마이징 저장(위치 추가, 칩 순서, 직접추가 항목) : 3인 공유 저장소 사용 ----
-let uiPrefs = { locationOverrides:{}, equipOrder:{}, customEquip:{}, subEquipOrder:{}, customSubEquip:{}, defectTagOrder:{}, customDefectTags:{}, defaultLocation:{}, locationRenames:{}, inspectionSession:{} };
+let uiPrefs = { locationOverrides:{}, equipOrder:{}, customEquip:{}, subEquipOrder:{}, customSubEquip:{}, defectTagOrder:{}, customDefectTags:{}, defaultLocation:{}, locationRenames:{}, structureOverrides:{}, inspectionSession:{}, customBuildings:{}, customBuildingsDeleted:[] };
 async function loadUiPrefs(){
   try{
     const res = await storageGet('ui_prefs', true);
@@ -720,8 +770,18 @@ function saveUiPrefsDebounced(){
         customDefectTags: unionMergeMap(remote.customDefectTags, uiPrefs.customDefectTags),
         defaultLocation: Object.assign({}, remote.defaultLocation, uiPrefs.defaultLocation), // 대상물별 "기본 위치" — 마지막에 저장한 사람 기준
         locationRenames: mergeLocationRenames(remote.locationRenames, uiPrefs.locationRenames), // 대상물별 동/층 오탈자 수정 이력
+        structureOverrides: Object.assign({}, remote.structureOverrides, uiPrefs.structureOverrides), // [v44] 대상물별 동/층 구조 전체 편집본 — 통째로 교체하는 작업이라 건물 단위로 "마지막에 저장한 사람 기준"으로 병합
         inspectionSession: Object.assign({}, remote.inspectionSession, uiPrefs.inspectionSession), // 대상물별 "오늘의 점검종류" — 마지막에 저장한 사람 기준
       };
+      // [v37] 수기 일정(+새 일정 추가) 병합 — 추가는 합집합, 삭제는 "삭제이력(tombstone)"을 합쳐서
+      // 다른 팀원이 아직 갖고있는 예전 값이 되살아나지 않게 한다(마지막에 지운 사람 기준으로 확정).
+      {
+        const delSet = new Set([...(remote.customBuildingsDeleted||[]), ...(uiPrefs.customBuildingsDeleted||[])]);
+        const mergedCB = Object.assign({}, remote.customBuildings, uiPrefs.customBuildings);
+        delSet.forEach(id=>{ delete mergedCB[id]; });
+        uiPrefs.customBuildings = mergedCB;
+        uiPrefs.customBuildingsDeleted = [...delSet];
+      }
       await storageSet('ui_prefs', JSON.stringify(uiPrefs), true);
     }catch(e){}
   }, 400);
@@ -749,6 +809,18 @@ function applyLocationRenames(building){
     if(def.wing && renames.wings && renames.wings[def.wing]) def.wing = renames.wings[def.wing];
     if(def.floor && renames.floors && renames.floors[def.floor]) def.floor = renames.floors[def.floor];
   }
+}
+// [v44 신규] "동/층 구조 편집" 결과 적용 — locationOverrides(추가만)·locationRenames(1:1 이름 수정)와 달리,
+// 이 편집은 대상물의 동/층 구조 자체를 통째로 재정의(교체)한다. 기준 동/층 정보가 실제와 다르면(마스터DB
+// 오류 포함) 지우거나 바꾸고, 새 동/층은 추가하는 현장 요구를 반영. 저장된 값이 있으면 항상 최종 우선 적용.
+function applyStructureOverride(building){
+  const ov = uiPrefs.structureOverrides[building];
+  if(!ov) return;
+  BUILDING_STRUCTURE[building] = {
+    wings: [...(ov.wings||[])],
+    floors: [...(ov.floors||[])],
+    floorsByWing: ov.floorsByWing ? JSON.parse(JSON.stringify(ov.floorsByWing)) : undefined
+  };
 }
 // 칩 컨테이너에 드래그 정렬 부여 (재렌더링마다 안전하게 재부착)
 function attachSortable(el, onEnd){
@@ -1396,7 +1468,7 @@ function renderBuildingDetail(){
   // 과거 이력 자체의 가치를 위해 손실 없이 그대로 병합한다 — 최신(신규 기록)이 위, 과거가 아래.
   const liveDefects = defectEntries.filter(e=>e.building===currentBuilding).slice().reverse().slice(0,10)
     .map(e=>({equip:e.equip||'(설비 미선택)', code:'현장 신규', content:e.defectContent||'', status:e.action||'조치대기'}));
-  const pastDefects = (PAST_DEFECTS[currentBuilding]||[])
+  const pastDefects = getPastDefectsFor(currentBuilding)
     .map(d=>({equip:d.equip, code:`${d.year} 이력 · ${d.code||''}`.replace(/\s*·\s*$/,''), content:d.content, status:d.status}));
   const r = {...(profile||{}), defects: [...liveDefects, ...pastDefects]};
 
@@ -1422,21 +1494,43 @@ document.querySelectorAll('#bdTabBar .dtab').forEach(el=>{
   };
 });
 
+// sub 문구("종합점검 · 07-20 예정" 등)에서 월-일을 뽑아 정렬키로 사용. 날짜가 없으면 맨 뒤로.
+function buildingSortKey(sub){
+  const m = (sub||'').match(/(\d{2})-(\d{2})/);
+  return m ? (m[1]+m[2]) : '99999';
+}
 function renderHome(){
   const list = $('homeList'); list.innerHTML='';
-  SAMPLE_BUILDINGS.forEach(b=>{
+  const customList = Object.entries(uiPrefs.customBuildings||{}).map(([id,b])=>({id, name:b.name, sub:b.sub, custom:true}));
+  const all = [...SAMPLE_BUILDINGS, ...customList].sort((a,b)=> buildingSortKey(a.sub).localeCompare(buildingSortKey(b.sub)));
+  all.forEach(b=>{
     const div = document.createElement('div');
     div.className = 'home-item';
-    div.innerHTML = `<div><div class="name">${b.name}</div><div class="sub">${b.sub}</div></div><button class="btn-secondary" style="width:auto;margin:0;padding:10px 16px;">점검 시작</button>`;
-    div.querySelector('button').onclick = ()=> startInspection(b.name);
+    div.innerHTML = `<div><div class="name">${b.name}</div><div class="sub">${b.sub}</div></div>
+      <div style="display:flex;align-items:center;gap:2px;">
+        <button class="btn-secondary start-btn" style="width:auto;margin:0;padding:10px 16px;">점검 시작</button>
+        ${b.custom ? `<span class="del-building-btn" style="color:var(--muted);font-size:20px;padding:6px 8px;cursor:pointer;">✕</span>` : ''}
+      </div>`;
+    div.querySelector('.start-btn').onclick = ()=> startInspection(b.name);
+    if(b.custom){
+      div.querySelector('.del-building-btn').onclick = ()=>{
+        if(!confirm(`"${b.name}" 일정을 목록에서 삭제할까요? (다른 팀원 화면에서도 함께 삭제됩니다)`)) return;
+        delete uiPrefs.customBuildings[b.id];
+        uiPrefs.customBuildingsDeleted = [...new Set([...(uiPrefs.customBuildingsDeleted||[]), b.id])];
+        saveUiPrefsDebounced();
+        renderHome();
+      };
+    }
     list.appendChild(div);
   });
 }
 async function startInspection(name){
   currentBuilding = name;
+  ensureMasterDataFor(name); // [v37] 이름이 대상물 마스터 DB(203개)에 있으면 기준정보/설비목록/동층구조 자동 채움
   await uiPrefsReady;
   applyLocationOverrides(name);
   applyLocationRenames(name); // [v20] 저장된 동/층 오탈자 수정 이력을 반영한 뒤 화면을 그림
+  applyStructureOverride(name); // [v44] 저장된 동/층 구조 전체 편집본이 있으면 최종적으로 그것으로 교체
   renderLocationSelectors();
   ensureInspectionSession(name); // [v31] 오늘 이미 골라둔 점검종류가 있으면 이어쓰고, 없으면 배지에서 선택 유도
   $('detailLocation').value=''; // [v21] 대상물이 바뀌면 상세위치도 초기화(다른 건물의 위치가 남아있으면 안 되므로)
@@ -1456,16 +1550,53 @@ $('customStartBtn').onclick = ()=>{
 };
 $('goConstructionBtn').onclick = ()=> goTo('photolog');
 
+// [v37] 수기 일정 추가 — 일정관리 기능이 완성되기 전까지, 다음 주 점검 예정 대상물을
+// "화정초등학교"처럼 홈 목록에 직접 등록해두고 매번 이름을 다시 입력하지 않게 함.
+// 팀 공유 저장소(ui_prefs.customBuildings)에 저장되어 팀원 화면에도 함께 나타난다.
+$('addScheduleBtn').onclick = ()=>{
+  const f = $('addScheduleForm');
+  f.style.display = (f.style.display==='none' ? 'block' : 'none');
+};
+$('cancelAddBuildingBtn').onclick = ()=>{
+  $('addScheduleForm').style.display='none';
+  $('newBuildingName').value=''; $('newBuildingDate').value='';
+};
+$('confirmAddBuildingBtn').onclick = ()=>{
+  const name = $('newBuildingName').value.trim();
+  const type = $('newBuildingType').value;
+  const dateVal = $('newBuildingDate').value; // yyyy-mm-dd
+  if(!name){ showToast('대상물명을 입력해주세요'); return; }
+  const foundInDb = ensureMasterDataFor(name); // [v37] DB(203개)에 있는 이름이면 기준정보/설비목록 자동 연동
+  let sub = type;
+  if(dateVal){
+    const parts = dateVal.split('-');
+    sub += ` · ${parts[1]}-${parts[2]} 예정`;
+  } else {
+    sub += ' · 예정일 미정';
+  }
+  const id = 'cb_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+  uiPrefs.customBuildings = uiPrefs.customBuildings || {};
+  uiPrefs.customBuildings[id] = { name, sub };
+  saveUiPrefsDebounced();
+  renderHome();
+  $('newBuildingName').value=''; $('newBuildingDate').value='';
+  $('addScheduleForm').style.display='none';
+  showToast(foundInDb ? name + ' 일정 추가 (DB 정보 자동 연동됨)' : name + ' 일정 추가 (DB에 없어 설비목록은 임시 전체목록)');
+};
+
 // ================= 불량내역 입력 =================
 // 대상물별 건물구조(동/층) - 실제로는 buildings 테이블에서 조회. 프로토타입은 목업.
 const BUILDING_STRUCTURE = {
-  '화정초등학교':          { wings: ['본관동','별관동','강당동'], floors: ['1F','2F','3F','4F'] },
+  '화정초등학교':          { wings: ['본관동','별관동','강당동'], floors: ['1F','2F','3F','4F'],
+                             floorsByWing: { '본관동':['1F','2F','3F','4F'], '별관동':['1F','2F','3F','4F'], '강당동':['1F','2F'] } }, // [v43] 철주님 확인 - 강당동은 2F까지만 실제 존재
   '꽃바위유치원':          { wings: [], floors: ['B3','B2','B1','1F'] },
-  '내황초등학교':          { wings: ['본관동','별관동','강당동'], floors: ['1F','2F','3F','4F'] },
+  '내황초등학교':          { wings: ['본관동','별관동','강당동'], floors: ['1F','2F','3F','4F'],
+                             floorsByWing: { '본관동':['1F','2F','3F','4F'], '별관동':['1F','2F','3F'], '강당동':['1F','2F'] } }, // [v42] 마스터DB 실사데이터 기준 - 별관동 3F까지, 강당동 2F까지만 실제 존재
   '㈜용산(울산공장·연암)': { wings: ['A동','B동'], floors: ['1F','2F','3F','4F','5F'] },
   '복산나이스':            { wings: [], floors: ['1F','2F','3F','4F'] },
   '고헌중학교':            { wings: [], floors: ['B1','1F','2F','3F','4F'] },
-  '중앙중학교':            { wings: ['본관동','별관동','강당동'], floors: ['1F','2F','3F','4F'] },
+  '중앙중학교':            { wings: ['본관동','별관동','강당동'], floors: ['1F','2F','3F','4F'],
+                             floorsByWing: { '본관동':['1F','2F','3F','4F'], '별관동':['1F','2F','3F','4F'], '강당동':['1F','2F'] } }, // [v42] 마스터DB 실사데이터 기준 - 강당동은 2F까지만 실제 존재
   '_default':      { wings: [], floors: ['B1','1F','2F','3F','4F','5F','6F','7F','8F'] }
 };
 // 대상물별 설비명 - 실제로는 이 대상물 facility_status 사용빈도순 조회. 프로토타입은 목업(사용빈도 순서로 미리 정렬).
@@ -1730,6 +1861,106 @@ const EQUIP_DB = {
   ],
   '_default': MASTER_EQUIP_LIST
 };
+
+
+// ---------------- [v37] 대상물 마스터 DB 연동 ----------------
+// 실제 203개 대상물의 주소/용도/점검종류/설치설비 데이터(buildings_실시결과점검표분석_20260624_변환결과_V04).
+// "+ 새 일정 추가"로 등록하거나 "직접 입력해서 시작"으로 입력한 이름이 이 DB의 이름과 같으면,
+// 기준정보·시설현황·설비목록(EQUIP_DB)·동층구조(BUILDING_STRUCTURE)를 자동으로 채워서
+// 61종 전체 목록이 아니라 그 대상물에 실제 설치된 설비만 불량입력에 뜨도록 한다.
+
+// buildings.js의 설비명(41종, 다소 뭉뚱그려진 표기)을 EQUIP_DB의 대분류(cat)로 매핑.
+// 1차로 MASTER_EQUIP_LIST에 정확히 같은 이름이 있으면 그 cat을 쓰고, 없으면 아래 별칭표를 쓴다.
+const _masterEquipCatByName = {};
+MASTER_EQUIP_LIST.forEach(e=>{ _masterEquipCatByName[e.name] = e.cat; });
+const MASTER_EQUIP_CAT_ALIAS = {
+  '가스·분말·고체자동소화장치':'소화설비', '간이스프링클러':'수계소화설비', '거실제연설비':'소화활동설비',
+  '부속실 등 제연설비':'소화활동설비', '비상경보설비':'경보설비', '상업용주방자동소화장치':'소화설비',
+  '소화기':'소화설비', '스프링클러':'수계소화설비', '연결송수관':'소화활동설비', '유도등':'피난구조설비',
+  '유도표지':'피난구조설비', '할로겐화합물 및 불활성기체 소화설비':'가스계소화설비'
+};
+function equipCatFor(name){ return _masterEquipCatByName[name] || MASTER_EQUIP_CAT_ALIAS[name] || '기타'; }
+
+// buildings.js 설비명 → FAC_TREE(시설현황 탭 체크박스) 라벨 매핑.
+// 애매해서 잘못 체크될 수 있는 것(소화기/유도등/가스·분말·고체자동소화장치)은 매핑하지 않고 비워둔다
+// — 불량입력용 설비목록(EQUIP_DB)에는 원래 이름 그대로 들어가니 지장 없고, 시설현황 체크만 보류되는 것.
+const MASTER_FAC_LABEL_ALIAS = {
+  '가스누설경보기':'가스누설경보기', '간이스프링클러':'간이스프링클러설비', '감지기':'자동화재탐지설비',
+  '거실제연설비':'제연설비', '구조대':'구조대', '단독경보형감지기':'단독경보형감지기', '무선통신보조설비':'무선통신보조설비',
+  '발신기':'자동화재탐지설비', '방화문':'방화문', '방화셔터':'방화셔터', '부속실 등 제연설비':'제연설비',
+  '비상경보설비':'비상경보설비', '비상구':'비상구', '비상방송설비':'비상방송설비', '비상조명등':'비상조명등',
+  '비상콘센트설비':'비상콘센트설비', '상수도소화용수설비':'상수도소화용수설비', '상업용주방자동소화장치':'상업용주방자동소화장치',
+  '소화수조':'소화수조', '수신기':'자동화재탐지설비', '스프링클러':'스프링클러설비', '시각경보기':'시각경보기',
+  '연결살수설비':'연결살수설비', '연결송수관':'연결송수관설비', '옥내소화전':'옥내소화전설비', '옥외소화전':'옥외소화전설비',
+  '완강기':'(간이)완강기', '유도표지':'유도표지', '이산화탄소소화설비':'이산화탄소소화설비', '인명구조기구':'인명구조기구',
+  '자동화재속보기':'자동화재속보설비', '자동확산소화기':'자동확산소화기', '저수조':'저수조',
+  '주거용주방자동소화장치':'주거용주방자동소화장치', '캐비닛형자동소화장치':'캐비닛형자동소화장치', '포소화설비':'포소화설비',
+  '할로겐화합물 및 불활성기체 소화설비':'할로겐화합물 및 불활성기체소화설비', '휴대용비상조명등':'휴대용비상조명등'
+};
+
+// buildings.js 1건의 equip 목록(name+sub)을 EQUIP_DB 항목 형식({name,cat,sub})으로 변환
+function masterEquipToEquipDB(equipList){
+  return (equipList||[]).map(e=>({ name:e.name, cat:equipCatFor(e.name), sub:(e.sub&&e.sub.length)?e.sub:null }));
+}
+// buildings.js의 wings({동명:[층목록], ...})를 BUILDING_STRUCTURE 형식({wings:[...], floors:[...], floorsByWing:{...}})으로 변환.
+// 키가 "_전체"뿐이면 동 구분이 없는 대상물이므로 wings는 빈 배열로 둔다(기존 _default 관례와 동일).
+// [v42] floorsByWing에 동별 실제 층 목록을 그대로 보존한다 — 동마다 층수가 다른 경우
+// (예: 본관동 4층, 강당동 2층) 드롭다운에 없는 층까지 뜨는 문제를 막기 위함.
+function masterWingsToStructure(wings){
+  wings = wings || {};
+  const wingNames = Object.keys(wings).filter(k=>k!=='_전체');
+  const floorSet = new Set();
+  Object.values(wings).forEach(fl=>(fl||[]).forEach(f=>floorSet.add(f)));
+  const floorsByWing = {};
+  wingNames.forEach(w=>{ floorsByWing[w] = wings[w] || []; });
+  return { wings: wingNames, floors: [...floorSet], floorsByWing };
+}
+// buildings.js 1건을 기준정보(BASIC_FIELD_DEFS 필드) + 시설현황(facility)으로 변환.
+// 이번 달 점검기간·층수·승강기 등 이 DB가 갖고 있지 않은 항목은 비워두어, 현장/사무실에서 보완 입력하게 한다.
+// [v46] 불량이력 조회 — 화정초 등 7개 대상물처럼 손으로 큐레이션한 PAST_DEFECTS가 있으면 그걸 우선 쓰고
+// (직접 다듬은 데이터라 정확도가 더 높음), 없는 대상물(개운초 등 나머지 196개)은 마스터DB(V06)가
+// Sheet5(불량 및 조치사항)에서 자동으로 뽑아준 이력(entry.defects)으로 대체한다. 둘 다 없으면 빈 배열.
+function getPastDefectsFor(name){
+  if(PAST_DEFECTS[name]) return PAST_DEFECTS[name];
+  if(typeof BUILDINGS_MASTER !== 'undefined' && BUILDINGS_MASTER && BUILDINGS_MASTER.data && BUILDINGS_MASTER.data[name]){
+    return BUILDINGS_MASTER.data[name].defects || [];
+  }
+  return [];
+}
+function masterEntryToProfileFields(entry){
+  const facility = {};
+  (entry.equip||[]).forEach(e=>{ const label = MASTER_FAC_LABEL_ALIAS[e.name]; if(label) facility[label]=true; });
+  // [v45] 마스터DB 변환기(V05)가 새로 담아주는 필드 반영. 층수(floorsText)는 원본이
+  // "본관 지상 5 층 / 지하 1 층\n지상 2층"처럼 줄바꿈으로 동을 구분한 자유서식 텍스트라,
+  // 화면(한 줄 표시)에 그대로 넣으면 줄바꿈이 안 보여 붙어버리므로 " / "로 이어붙여 표시한다.
+  const floorsDisplay = (entry.floorsText||'').split('\n').map(s=>s.trim()).filter(Boolean).join(' / ');
+  return {
+    year: entry.year||'', type: entry.inspectType||'', div: entry.div||'', pm: entry.pm||'',
+    tym: entry.fullInspectMonth||'', twm: entry.workInspectMonth||'',
+    floor_area: entry.totalArea||'', build_area: entry.buildArea||'', floors: floorsDisplay,
+    height: entry.height||'', buildings: entry.buildingCount||'', structure: entry.structure||'',
+    staircase: entry.staircase||'', elevator: entry.elevator||'', parking: entry.parking||'',
+    multi_use: entry.multiUse||'', period: entry.period||'', insurance: entry.insurance||'', address: entry.address||'',
+    usage: entry.usage||'', fire_plan: entry.firePlan||'',
+    // [v46] 기기사양(spec) — V04~V05까지는 "부품레벨은 안정적으로 못 뽑는다"며 항상 비워뒀던 원칙을
+    // 폐기하고, V06 변환기가 Sheet4(3단 헤더)를 정식으로 테이블 매핑해서 넣어준 값을 그대로 반영한다.
+    facility, multi_facility:{}, extinguisher: entry.extinguisher||{}, spec: entry.spec||{}
+  };
+}
+// "새 일정 추가"·"직접 입력해서 시작" 어디서든 대상물 화면을 열기 전에 이 함수를 먼저 불러,
+// 이름이 대상물 마스터 DB에 있으면 기준정보·설비목록·동층구조를 자동으로 채운다.
+// 이미 값이 있으면(7개 대상물의 수작업 큐레이션본 등) 덮어쓰지 않아 기존 정밀 데이터를 보존한다.
+function ensureMasterDataFor(name){
+  // [v41] 대상물 마스터 데이터 파일(<script src>)이 어떤 이유로든 로드되지 않았을 때,
+  // 여기서 앱 전체가 멈추지 않고 "DB 연동 없이" 이전처럼 동작하도록 안전하게 빠져나감.
+  if(typeof BUILDINGS_MASTER === 'undefined' || !BUILDINGS_MASTER) return false;
+  const entry = BUILDINGS_MASTER.data && BUILDINGS_MASTER.data[name];
+  if(!entry) return false;
+  if(!BUILDING_PROFILES[name]) BUILDING_PROFILES[name] = masterEntryToProfileFields(entry);
+  if(!EQUIP_DB[name]) EQUIP_DB[name] = masterEquipToEquipDB(entry.equip);
+  if(!BUILDING_STRUCTURE[name]) BUILDING_STRUCTURE[name] = masterWingsToStructure(entry.wings);
+  return true;
+}
 
 // 실시결과점검표분석 1,540건 실제 빈도 기준 (기존 손상/누수/오염은 실사용 데이터 없음 확인되어 교체)
 // 설비명이 선택되지 않았거나 EQUIP_DEFECT_MAP에 없는 설비일 때 쓰는 기본(전체 평균) 목록
@@ -2004,7 +2235,11 @@ function renderCombinedLocationSelect(){
   const wings = struct.wings.length ? struct.wings : [''];
   const opts = [];
   wings.forEach(w=>{
-    struct.floors.forEach(f=>{
+    // [v42] 동마다 실제 층수가 다를 수 있음(예: 본관동 4층, 강당동 2층).
+    // struct.floorsByWing에 그 동의 실제 층 목록이 있으면 그것만 쓰고, 없으면(기존 방식)
+    // 전체 공통 floors를 그대로 써서 예전 대상물은 지금까지와 똑같이 동작한다.
+    const floorsForWing = (struct.floorsByWing && struct.floorsByWing[w]) ? struct.floorsByWing[w] : struct.floors;
+    floorsForWing.forEach(f=>{
       const label = w ? `${w} ${f}` : f;
       opts.push(`<option value="${w}|${f}">${label}</option>`);
     });
@@ -2069,26 +2304,87 @@ $('locAddToggle').onclick = ()=>{
   locAddOpen = !locAddOpen;
   $('locAdvancedPanel').style.display = locAddOpen ? 'block' : 'none';
 };
-$('locAddCommitBtn').onclick = ()=>{
-  const w = $('newWingInput').value.trim();
-  const f = $('newFloorInput').value.trim();
-  if(!w && !f){ showToast('동 또는 층 중 하나는 입력해주세요'); return; }
-  const struct = BUILDING_STRUCTURE[currentBuilding] || (BUILDING_STRUCTURE[currentBuilding] = {wings:[...BUILDING_STRUCTURE['_default'].wings], floors:[...BUILDING_STRUCTURE['_default'].floors]});
-  if(w && !struct.wings.includes(w)) struct.wings.push(w);
-  if(f && !struct.floors.includes(f)) struct.floors.push(f);
-  if(currentBuilding){
-    const ov = uiPrefs.locationOverrides[currentBuilding] || (uiPrefs.locationOverrides[currentBuilding] = {wings:[],floors:[]});
-    if(w && !ov.wings.includes(w)) ov.wings.push(w);
-    if(f && !ov.floors.includes(f)) ov.floors.push(f);
-    saveUiPrefsDebounced();
+// [v44 신규] 동/층 구조 전체 편집기 — 기존엔 새 동/층을 "추가"만 할 수 있고, 동마다 실제 층이
+// 달라도(floorsByWing) 이를 반영해 수정하거나 잘못된 동/층을 지울 수 없었다. 이제 대상물의 동별
+// 층 목록을 화면에서 직접 고쳐 쓰고, 저장 즉시 팀 공유 저장소(ui_prefs.structureOverrides)에
+// 반영한다 — 기준 정보가 실제와 다르면 현장에서 바로 바꾸고, 새 동/층은 자유롭게 추가.
+let structDraftRows = [];
+function renderStructRows(){
+  const wrap = $('structRows'); wrap.innerHTML = '';
+  structDraftRows.forEach((row,i)=>{
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;';
+    div.innerHTML = `
+      <input type="text" class="struct-wing-name" placeholder="동 이름(없으면 비움)" style="flex:0.8;font-size:13px;padding:8px;border:1px solid var(--border);border-radius:8px;">
+      <input type="text" class="struct-wing-floors" placeholder="층 목록, 쉼표로 구분 (예: 1F,2F,3F)" style="flex:1.6;font-size:13px;padding:8px;border:1px solid var(--border);border-radius:8px;">
+      <span class="struct-row-del" style="cursor:pointer;color:var(--muted);font-size:18px;padding:0 4px;">✕</span>
+    `;
+    const nameInput = div.querySelector('.struct-wing-name');
+    const floorsInput = div.querySelector('.struct-wing-floors');
+    nameInput.value = row.name;
+    floorsInput.value = row.floors.join(',');
+    nameInput.oninput = e=>{ row.name = e.target.value; };
+    floorsInput.oninput = e=>{ row.floors = e.target.value.split(',').map(s=>s.trim()).filter(Boolean); };
+    div.querySelector('.struct-row-del').onclick = ()=>{
+      if(structDraftRows.length===1){ showToast('최소 1개 행은 남아 있어야 합니다'); return; }
+      structDraftRows.splice(i,1);
+      renderStructRows();
+    };
+    wrap.appendChild(div);
+  });
+}
+function openStructEditor(){
+  if(!currentBuilding){ showToast('대상물을 먼저 선택해주세요'); return; }
+  const struct = BUILDING_STRUCTURE[currentBuilding] || BUILDING_STRUCTURE['_default'];
+  if(struct.wings && struct.wings.length){
+    structDraftRows = struct.wings.map(w=>({ name:w, floors:(struct.floorsByWing && struct.floorsByWing[w]) ? [...struct.floorsByWing[w]] : [...struct.floors] }));
+  } else {
+    structDraftRows = [{ name:'', floors:[...struct.floors] }];
   }
+  $('structOverlayTitle').textContent = `동/층 구조 편집 — ${currentBuilding}`;
+  renderStructRows();
+  $('structOverlay').classList.add('show');
+}
+$('structEditBtn').onclick = ()=>{ $('locAdvancedPanel').style.display='none'; locAddOpen=false; openStructEditor(); };
+$('structAddRowBtn').onclick = ()=>{ structDraftRows.push({ name:'', floors:[] }); renderStructRows(); };
+$('structClose').onclick = ()=> $('structOverlay').classList.remove('show');
+$('structSaveBtn').onclick = ()=>{
+  const rows = structDraftRows.filter(r=> r.floors.length>0 || r.name.trim());
+  if(!rows.length){ showToast('최소 한 줄은 층 정보를 입력해주세요'); return; }
+  const namedRows = rows.filter(r=>r.name.trim());
+  let wings, floors, floorsByWing;
+  if(namedRows.length===0){
+    // 동 구분 없는 건물
+    wings = [];
+    floors = rows[0].floors;
+    floorsByWing = undefined;
+  } else {
+    wings = []; floorsByWing = {};
+    const seen = new Set();
+    namedRows.forEach(r=>{
+      const nm = r.name.trim();
+      if(seen.has(nm)) return; // 같은 이름 중복 입력은 첫 값만 사용
+      seen.add(nm);
+      wings.push(nm);
+      floorsByWing[nm] = r.floors;
+    });
+    floors = [...new Set(Object.values(floorsByWing).flat())];
+  }
+  if(!floors.length && !wings.length){ showToast('층 정보를 최소 1개 입력해주세요'); return; }
+  uiPrefs.structureOverrides[currentBuilding] = { wings, floors, floorsByWing };
+  saveUiPrefsDebounced();
+  applyStructureOverride(currentBuilding);
   renderLocationSelectors();
-  if(w) $('wingSelect').value = w;
-  if(f) $('floorSelect').value = f;
-  syncCombinedLocationValue();
-  $('newWingInput').value=''; $('newFloorInput').value='';
-  locAddOpen=false; $('locAdvancedPanel').style.display='none';
-  showToast('추가했습니다. 다음 점검부터 바로 사용할 수 있습니다');
+  $('structOverlay').classList.remove('show');
+  showToast(`${currentBuilding}의 동/층 구조를 저장했습니다 (팀원 화면에도 반영됩니다)`);
+};
+$('structResetBtn').onclick = ()=>{
+  if(!currentBuilding) return;
+  if(!confirm(`"${currentBuilding}"의 동/층 구조를 저장된 편집본 없이 원래(자동 연동/기본) 값으로 되돌릴까요?\n(새로고침 후 반영됩니다)`)) return;
+  delete uiPrefs.structureOverrides[currentBuilding];
+  saveUiPrefsDebounced();
+  $('structOverlay').classList.remove('show');
+  showToast('되돌리기 요청을 저장했습니다. 새로고침하면 원래 구조로 보입니다');
 };
 
 // ---- 설비명 (대분류 그룹 + 빈도순 + 부속설비 2단선택 + 인라인 "+ 추가") ----
@@ -4266,9 +4562,19 @@ setInterval(()=>{
 }, 20000);
 
 // ---------------- 초기화 ----------------
+// [v40] 하단에 현재 어느 업체 데이터로 실행 중인지 표시(여러 업체 코드로 접속을 나눠 쓰게 될 때 헷갈리지 않도록)
+if($('tenantLabel')) $('tenantLabel').textContent = (TENANT_FILES[CURRENT_TENANT_CODE]||{}).name || CURRENT_TENANT_CODE;
+// [v37] "새 일정 추가" 폼의 대상물명 자동완성 - 마스터 DB(203개) 이름 전체를 미리 채워둔다.
+(function populateMasterBuildingDatalist(){
+  const dl = $('masterBuildingNames'); if(!dl || typeof BUILDINGS_MASTER === 'undefined' || !BUILDINGS_MASTER || !BUILDINGS_MASTER.data) return;
+  Object.keys(BUILDINGS_MASTER.data).forEach(n=>{
+    const o = document.createElement('option'); o.value = n; dl.appendChild(o);
+  });
+})();
 renderHome();
 updateSyncBanner();
 uiPrefsReady.then(()=>{
+  renderHome(); // 팀 공유 저장소에서 불러온 수기 일정(customBuildings)을 반영해 다시 그림
   renderLocationSelectors();
   renderDefectChips();
 });
