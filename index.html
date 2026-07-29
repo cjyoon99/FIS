@@ -18,6 +18,7 @@ window.onerror = function(msg, url, line, col, err){
   :root{
     --accent:#2f6fed; --danger:#d64545; --warning:#c98a1a; --success:#1fae6a;
     --bg:#f5f6f8; --card:#ffffff; --border:#dfe3e8; --text:#1a1d22; --muted:#6b7280;
+    --jonghap:#1fae6a; --jonghap-bg:#e4f6ec; --jakdong:#d64545; --jakdong-bg:#fbe9e9;
   }
   *{box-sizing:border-box;}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);padding-bottom:60px;}
@@ -55,6 +56,12 @@ window.onerror = function(msg, url, line, col, err){
   .capture-mode-btn{flex:1;padding:11px;border:1px solid var(--accent);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;color:var(--accent);}
   .capture-mode-btn.active-mode{background:var(--accent);color:#fff;}
   .entry{display:flex;gap:10px;padding:12px;border:1px solid var(--border);border-radius:10px;margin-top:10px;background:#fff;align-items:center;}
+  .icon-action-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;}
+  .icon-action{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 4px;border:1px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;font-size:10.5px;color:var(--text);}
+  .icon-action .ia-ic{font-size:19px;}
+  .icon-action.danger{color:var(--danger);}
+  .icon-action.accent{color:var(--accent);}
+  .icon-action .ia-badge{position:absolute;top:4px;right:8px;background:var(--danger);color:#fff;font-size:9px;font-weight:700;border-radius:8px;padding:1px 5px;min-width:14px;}
   .entry img{width:52px;height:52px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee;}
   .entry .meta{flex:1;min-width:0;}
   .entry .title{font-size:14px;font-weight:600;}
@@ -74,6 +81,14 @@ window.onerror = function(msg, url, line, col, err){
 
   /* 홈 화면 */
   .home-item{display:flex;justify-content:space-between;align-items:center;padding:14px;border:1px solid var(--border);border-radius:10px;margin-top:10px;background:#fff;}
+  .status-badge{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:10px;display:inline-block;}
+  .status-select{font-size:11.5px;padding:4px 6px;border-radius:6px;border:1.5px solid var(--border);font-family:inherit;margin-top:5px;}
+  .overdue-warn{color:var(--danger);font-size:10.5px;font-weight:700;margin-left:4px;}
+  .progress-bar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:#eee;margin:8px 0 6px;}
+  .progress-bar .seg{height:100%;}
+  .progress-legend{display:flex;flex-wrap:wrap;gap:6px 10px;font-size:10.5px;color:var(--muted);}
+  .progress-legend .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle;}
+  .progress-summary{font-size:12.5px;font-weight:700;margin-bottom:2px;}
   .home-item .name{font-size:15px;font-weight:600;}
   .home-item .sub{font-size:12px;color:var(--muted);margin-top:2px;}
 
@@ -191,6 +206,86 @@ window.onerror = function(msg, url, line, col, err){
   .inspection-badge .chg{color:var(--accent);font-weight:700;cursor:pointer;white-space:nowrap;margin-left:10px;}
   .sync-banner.shared{background:#eafaf1;color:var(--success);}
   .sync-banner.local{background:#fdf3e3;color:var(--warning);}
+
+  /* ===================== [v48] 일정관리 대시보드 뷰(#view-schedule) — 병합 시 기존 .card/.chip 등과
+     이름이 겹치는 클래스는 sd- 접두어로 새로 만들고, 그 외는 #view-schedule 안에서만 적용되도록 범위를 좁혔다. ===================== */
+  #view-schedule{max-width:1040px;margin:0 auto;padding:14px 16px 0;}
+  #view-schedule .sd-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px;}
+  #view-schedule .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  #view-schedule .toolbar-left{display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap;}
+  #view-schedule .file-btn{border:1px solid var(--border);background:var(--bg);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;}
+  #view-schedule .filename{color:var(--muted);}
+  #view-schedule .btn.primary{background:var(--accent);color:#fff;}
+  #view-schedule .btn.success{background:var(--success);color:#fff;}
+  #view-schedule .btn.danger{background:var(--danger);color:#fff;}
+  #view-schedule .btn.ghost{background:var(--bg);color:var(--text);border:1px solid var(--border);}
+  #view-schedule .btn{border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;}
+
+  #view-schedule .summary-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+  #view-schedule .summary-card{border-radius:12px;padding:14px;text-align:center;}
+  #view-schedule .summary-card.all{background:#e7eefc;}
+  #view-schedule .summary-card.jonghap{background:var(--jonghap-bg);}
+  #view-schedule .summary-card.jakdong{background:var(--jakdong-bg);}
+  #view-schedule .summary-card .lb{font-size:12.5px;color:#333;font-weight:600;}
+  #view-schedule .summary-card .num{font-size:22px;font-weight:800;margin-top:4px;}
+
+  #view-schedule .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  #view-schedule .cal-nav .navbtn{border:1px solid var(--border);background:var(--card);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;}
+  #view-schedule .cal-nav .title{font-size:17px;font-weight:700;}
+  #view-schedule .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+  #view-schedule .cal-dow{text-align:center;font-size:11.5px;font-weight:700;color:var(--muted);padding:4px 0;}
+  #view-schedule .cal-dow.sun{color:var(--danger);}
+  #view-schedule .cal-dow.sat{color:var(--accent);}
+  #view-schedule .cal-day{min-height:82px;border:1px solid var(--border);border-radius:8px;padding:4px 4px 5px;background:var(--card);position:relative;}
+  #view-schedule .cal-day.out{background:#fafbfc;color:#c7ccd3;}
+  #view-schedule .cal-day.dragover{outline:2px dashed var(--accent);outline-offset:-2px;background:#eef3ff;}
+  #view-schedule .cal-day .dnum{font-size:11.5px;font-weight:700;margin-bottom:3px;}
+  #view-schedule .cal-day.sun .dnum{color:var(--danger);}
+  #view-schedule .cal-day.sat .dnum{color:var(--accent);}
+  #view-schedule .cal-day.today .dnum{display:inline-block;background:var(--accent);color:#fff;border-radius:50%;width:17px;height:17px;line-height:17px;text-align:center;}
+  #view-schedule .sd-chip{font-size:9.5px;padding:3px 4px;border-radius:5px;margin-bottom:3px;cursor:grab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
+  #view-schedule .sd-chip.jonghap{background:var(--jonghap-bg);color:#0d5c33;border:1px solid #b9e4cc;}
+  #view-schedule .sd-chip.jakdong{background:var(--jakdong-bg);color:#8f2323;border:1px solid #f0c2c2;}
+  #view-schedule .sd-chip:active{cursor:grabbing;opacity:0.6;}
+  #view-schedule .cal-day .overbadge{position:absolute;top:3px;right:4px;font-size:10px;color:var(--danger);font-weight:800;}
+  #view-schedule .cal-day-inner{position:relative;z-index:1;}
+
+  #view-schedule .week-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  #view-schedule .week-nav .title{font-size:14.5px;font-weight:700;}
+  #view-schedule .week-day-block{border-bottom:1px solid var(--border);padding:9px 0;}
+  #view-schedule .week-day-block:last-child{border-bottom:none;}
+  #view-schedule .week-day-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);margin-bottom:6px;flex-wrap:wrap;gap:4px;}
+  #view-schedule .week-day-head .cap{font-size:10.5px;}
+  #view-schedule .week-day-head .cap.over{color:var(--danger);font-weight:700;}
+  #view-schedule .week-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;background:var(--bg);margin-bottom:5px;font-size:12px;cursor:pointer;flex-wrap:wrap;}
+  #view-schedule .week-item .tag{font-size:10px;padding:2px 6px;border-radius:10px;font-weight:700;flex-shrink:0;}
+  #view-schedule .week-item .tag.jonghap{background:var(--jonghap-bg);color:#0d5c33;}
+  #view-schedule .week-item .tag.jakdong{background:var(--jakdong-bg);color:#8f2323;}
+  #view-schedule .week-item .nm{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #view-schedule .week-item .meta{color:var(--muted);font-size:11px;flex-shrink:0;}
+  #view-schedule .week-empty{color:var(--muted);font-size:12.5px;padding:10px 0;}
+
+  #view-schedule .sd-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:150;align-items:center;justify-content:center;}
+  #view-schedule .sd-modal-overlay.show{display:flex;}
+  #view-schedule .sd-modal{background:#fff;border-radius:14px;padding:20px;width:92%;max-width:400px;max-height:88vh;overflow-y:auto;}
+  #view-schedule .sd-modal h3{margin:0 0 14px;font-size:16px;}
+  #view-schedule .sd-modal label{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 4px;}
+  #view-schedule .sd-modal input,#view-schedule .sd-modal select{width:100%;padding:8px 9px;border:1.5px solid var(--border);border-radius:8px;font-size:13.5px;font-family:inherit;}
+  #view-schedule .sd-modal .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  #view-schedule .sd-modal-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;}
+  #view-schedule .sd-modal-actions .btn{flex:1;min-width:80px;}
+
+  #view-schedule .settings-row{display:flex;gap:14px;align-items:center;font-size:12px;color:var(--muted);flex-wrap:wrap;}
+  #view-schedule .settings-row input{width:80px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px;}
+
+  #view-schedule .progress-card{margin-bottom:14px;}
+  #view-schedule .progress-summary{font-size:13px;font-weight:700;margin-bottom:6px;}
+  #view-schedule .progress-bar{display:flex;height:12px;border-radius:6px;overflow:hidden;background:#eee;margin-bottom:8px;}
+  #view-schedule .progress-bar .seg{height:100%;}
+  #view-schedule .progress-legend{display:flex;flex-wrap:wrap;gap:5px 10px;font-size:10.5px;color:var(--muted);}
+  #view-schedule .progress-legend .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle;}
+  #view-schedule .status-badge{font-size:9.5px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;}
+  #view-schedule .overdue-warn{color:var(--danger);font-size:10px;font-weight:700;margin-left:4px;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
@@ -233,12 +328,17 @@ window.onerror = function(msg, url, line, col, err){
 </header>
 <div id="syncBanner" class="sync-banner"></div>
 <div id="inspectionBadge" class="inspection-badge" style="display:none;"></div>
+<div id="masterDbWarning" style="display:none;background:#fdecea;color:#b3261e;font-size:12px;text-align:center;padding:8px 16px;font-weight:600;"></div>
 
 <main>
 
   <!-- ================= 홈 화면 ================= -->
   <div class="view active" id="view-home">
-    <div class="section-label" style="margin-top:0;">내 담당 대상물 <span id="addScheduleBtn" style="font-weight:400;color:var(--accent);cursor:pointer;font-size:12px;">+ 새 일정 추가</span></div>
+    <div class="section-label" style="margin-top:0;">이번 주 진행중 대상물 (일정관리 대시보드 연동)</div>
+    <div class="card" id="scheduleProgressCard" style="padding:10px 12px;"></div>
+    <div id="scheduleHomeList"></div>
+
+    <div class="section-label">수기로 추가한 대상물 <span id="addScheduleBtn" style="font-weight:400;color:var(--accent);cursor:pointer;font-size:12px;">+ 새 일정 추가</span></div>
     <div class="card" id="addScheduleForm" style="display:none;">
       <label style="margin-top:0;">대상물명</label>
       <input type="text" id="newBuildingName" placeholder="예: 삼산빌딩 (기존 등록 대상물이면 자동완성)" list="masterBuildingNames">
@@ -289,6 +389,7 @@ window.onerror = function(msg, url, line, col, err){
       <div style="display:flex;gap:6px;">
         <select id="locCombinedSelect" style="flex:1.3;"></select>
         <input type="text" id="detailLocation" placeholder="예: 3-2반 옆" style="flex:1;">
+        <button type="button" id="detailLocationClearBtn" title="지우기" style="width:32px;flex-shrink:0;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:15px;cursor:pointer;color:var(--muted);">✕</button>
         <button type="button" id="micBtn" style="width:44px;flex-shrink:0;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:17px;cursor:pointer;">🎤</button>
       </div>
       <!-- 동/층 실제 값은 이 숨김 select 2개가 계속 들고 있음(기존 저장 로직 호환용). 화면엔 노출 안 함 -->
@@ -350,10 +451,12 @@ window.onerror = function(msg, url, line, col, err){
     <div id="defectList"></div>
     <div id="defectEmpty" class="empty">아직 저장된 항목이 없습니다</div>
 
-    <button class="btn-secondary" id="defectExportBtn">📤 전체 내보내기 (JSON 다운로드)</button>
-    <button class="btn-secondary" id="defectExportXlsxBtn">📊 엑셀로 저장 (공식 양식)</button>
-    <button class="btn-secondary" id="defectTrashOpenBtn">🗑 휴지통 (<span id="defectTrashCount">0</span>건) · 복원 가능</button>
-    <button class="btn-secondary" id="defectClearBtn" style="color:var(--danger);">🗑 이 대상물 불량내역 초기화</button>
+    <div class="icon-action-row">
+      <button type="button" class="icon-action" id="defectExportBtn"><span class="ia-ic">📤</span><span class="ia-lb">JSON백업</span></button>
+      <button type="button" class="icon-action" id="defectExportXlsxBtn"><span class="ia-ic">📊</span><span class="ia-lb">엑셀출력</span></button>
+      <button type="button" class="icon-action" id="defectTrashOpenBtn"><span class="ia-ic">🗑</span><span class="ia-lb">휴지통</span><span class="ia-badge" id="defectTrashCount">0</span></button>
+      <button type="button" class="icon-action danger" id="defectClearBtn"><span class="ia-ic">🔄</span><span class="ia-lb">초기화</span></button>
+    </div>
   </div>
 
   <!-- ================= 점검 사진대장 ================= -->
@@ -387,19 +490,20 @@ window.onerror = function(msg, url, line, col, err){
     </div>
 
     <div class="section-label">
-      <span>촬영된 사진 (<span id="photoCount">0</span>장)</span>
+      <span>사진대장 (보고서용) · <span id="photoCount">0</span>장</span>
       <span><span id="photoSelectedCount" style="font-weight:400;color:var(--muted);font-size:12px;"></span> <span id="photoSyncBtn" style="font-weight:400;color:var(--accent);cursor:pointer;font-size:12px;">🔄 동기화</span></span>
     </div>
     <div id="photoList"></div>
     <div id="photoEmpty" class="empty">아직 촬영된 사진이 없습니다</div>
 
-    <button class="btn-secondary" id="photoTrashOpenBtn">🗑 휴지통 (<span id="photoTrashCount">0</span>장) · 복원 가능</button>
-    <button class="btn-primary green" id="previewBtn">✅ 선택한 사진으로 앨범 미리보기</button>
-    <button class="btn-secondary" id="photoExportXlsxBtn">📊 점검사진대장 (엑셀 공식 양식)</button>
-    <button class="btn-secondary" id="photoExportOtherPdfBtn">📄 기타 보관용 사진 PDF로 저장</button>
-    <button class="btn-secondary" id="photoExportBtn">📤 전체 내보내기 (JSON 다운로드)</button>
-    <button class="btn-secondary" id="photoSaveToGalleryBtn">📲 내 사진함으로 저장 (증거 보관용)</button>
-    <button class="btn-secondary" id="photoClearBtn" style="color:var(--danger);">🗑 이 대상물 사진 초기화</button>
+    <div class="icon-action-row">
+      <button type="button" class="icon-action" id="photoTrashOpenBtn"><span class="ia-ic">🗑</span><span class="ia-lb">휴지통</span><span class="ia-badge" id="photoTrashCount">0</span></button>
+      <button type="button" class="icon-action accent" id="previewBtn"><span class="ia-ic">✅</span><span class="ia-lb">미리보기</span></button>
+      <button type="button" class="icon-action" id="photoExportXlsxBtn"><span class="ia-ic">📊</span><span class="ia-lb">사진대장출력</span></button>
+      <button type="button" class="icon-action" id="photoExportBtn"><span class="ia-ic">📤</span><span class="ia-lb">JSON백업</span></button>
+      <button type="button" class="icon-action" id="photoSaveToGalleryBtn"><span class="ia-ic">📲</span><span class="ia-lb">사진함저장</span></button>
+      <button type="button" class="icon-action danger" id="photoClearBtn"><span class="ia-ic">🔄</span><span class="ia-lb">초기화</span></button>
+    </div>
 
     <div id="previewArea">
       <div class="preview-group report" id="previewGroupReport">
@@ -411,7 +515,20 @@ window.onerror = function(msg, url, line, col, err){
         <div class="photo-grid" id="previewGrid"></div>
         <button class="btn-secondary" id="printBtn">🖨 보고서용 인쇄 / PDF로 저장</button>
       </div>
-      <div class="preview-group other" id="previewGroupOther" style="margin-top:22px;border-top:2px dashed var(--border);padding-top:16px;">
+    </div>
+
+    <!-- ================= [v49] 기타 보관용 사진 — 사진대장(보고서용)과 완전히 분리된 별도 섹션 ================= -->
+    <div class="section-divider" style="margin-top:24px;border-top:2px dashed var(--border);padding-top:18px;">
+      <div class="section-label" style="margin-top:0;">
+        <span>📁 기타 보관용 사진 · <span id="otherPhotoCount">0</span>장 <span style="font-weight:400;color:var(--muted);font-size:11px;">(공식 보고서와 무관, 별도 보관)</span></span>
+      </div>
+      <div id="otherPhotoList"></div>
+      <div id="otherPhotoEmpty" class="empty">아직 촬영된 기타 보관용 사진이 없습니다</div>
+      <div class="icon-action-row" style="grid-template-columns:repeat(2,1fr);">
+        <button type="button" class="icon-action" id="photoExportOtherPdfBtn"><span class="ia-ic">📄</span><span class="ia-lb">PDF저장</span></button>
+        <button type="button" class="icon-action" id="otherPhotoExportXlsxBtn"><span class="ia-ic">📊</span><span class="ia-lb">엑셀저장</span></button>
+      </div>
+      <div class="preview-group other" id="previewGroupOther" style="margin-top:16px;">
         <div class="album-cover">
           <div style="font-weight:700;font-size:15px;">기타 보관용 사진</div>
           <div style="font-size:12px;color:var(--muted);margin-top:6px;" id="previewBuildingOther">대상명 :</div>
@@ -455,8 +572,10 @@ window.onerror = function(msg, url, line, col, err){
       <div id="constructionList"></div>
       <div id="constructionEmpty" class="empty">아직 저장된 항목이 없습니다</div>
 
-      <button class="btn-secondary" id="constructionExportXlsxBtn">📊 공사 사진 대장 (엑셀)</button>
-      <button class="btn-secondary" id="constructionClearBtn" style="color:var(--danger);">🗑 이 대상물만 삭제</button>
+      <div class="icon-action-row" style="grid-template-columns:repeat(2,1fr);">
+        <button type="button" class="icon-action" id="constructionExportXlsxBtn"><span class="ia-ic">📊</span><span class="ia-lb">엑셀출력</span></button>
+        <button type="button" class="icon-action danger" id="constructionClearBtn"><span class="ia-ic">🔄</span><span class="ia-lb">초기화</span></button>
+      </div>
     </div>
   </div>
 
@@ -501,6 +620,85 @@ window.onerror = function(msg, url, line, col, err){
     </div>
   </div>
 
+  <!-- ================= [v48] 일정관리 대시보드 뷰 (구 별도 파일을 이 안에 병합) ================= -->
+  <div class="view" id="view-schedule">
+
+    <div class="sd-card toolbar">
+      <div class="toolbar-left">
+        <span style="font-weight:600;">엑셀 일정 업로드 (.xlsx)</span>
+        <button class="file-btn" id="xlsxPickBtn">파일 선택</button>
+        <span class="filename" id="xlsxFileName">선택된 파일 없음</span>
+        <input type="file" id="xlsxFileInput" accept=".xlsx" style="display:none;">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn ghost" id="addEntryBtn">+ 새 일정</button>
+        <button class="btn success" id="xlsxExportBtn">📤 엑셀 내보내기</button>
+        <button class="btn danger" id="scheduleResetBtn">🔄 월간 일정 초기화</button>
+      </div>
+    </div>
+
+    <div class="summary-row">
+      <div class="summary-card all"><div class="lb">전체 일정</div><div class="num" id="sumAll">0건</div></div>
+      <div class="summary-card jonghap"><div class="lb">종합점검</div><div class="num" id="sumJonghap">0건</div></div>
+      <div class="summary-card jakdong"><div class="lb">작동점검</div><div class="num" id="sumJakdong">0건</div></div>
+    </div>
+
+    <div class="sd-card progress-card" id="progressCard"></div>
+
+    <div class="sd-card">
+      <div class="cal-nav">
+        <button class="navbtn" id="prevMonthBtn">◀ 이전달</button>
+        <div class="title" id="calTitle">2026년 07월</div>
+        <button class="navbtn" id="nextMonthBtn">다음달 ▶</button>
+      </div>
+      <div class="cal-grid" id="calDow"></div>
+      <div class="cal-grid" id="calGrid" style="margin-top:6px;"></div>
+    </div>
+
+    <div class="sd-card">
+      <div class="week-nav">
+        <button class="navbtn" id="prevWeekBtn">◀ 이전주</button>
+        <div class="title" id="weekTitle">이번 주 TODO</div>
+        <button class="navbtn" id="nextWeekBtn">다음주 ▶</button>
+      </div>
+      <div id="weekBody"></div>
+    </div>
+
+    <div class="sd-modal-overlay" id="modalOverlay">
+      <div class="sd-modal">
+        <h3 id="modalTitle">일정 수정</h3>
+        <label>대상물명</label>
+        <input type="text" id="fBuilding" placeholder="예: 울산여고">
+        <div class="row2">
+          <div><label>점검유형</label>
+            <select id="fType"><option value="종합점검">종합점검</option><option value="작동점검">작동점검</option></select>
+          </div>
+          <div><label>수행팀</label><input type="text" id="fTeam" value="점검1팀"></div>
+        </div>
+        <div class="row2">
+          <div><label>시작일</label><input type="date" id="fStart"></div>
+          <div><label>기간(일)</label><input type="number" id="fDuration" min="1" value="1"></div>
+        </div>
+        <div class="row2">
+          <div><label>면적(㎡)</label><input type="number" id="fArea" min="0" step="0.01"></div>
+          <div><label>지역</label><input type="text" id="fDistrict" placeholder="예: 남구"></div>
+        </div>
+        <label>비고</label>
+        <input type="text" id="fNote">
+        <label>진척 상태</label>
+        <select id="fStatus"></select>
+        <div class="sd-modal-actions">
+          <button class="btn ghost" id="modalCancelBtn">취소</button>
+          <button class="btn danger" id="modalDeleteBtn">삭제</button>
+          <button class="btn primary" id="modalSaveBtn">저장</button>
+        </div>
+        <div class="sd-modal-actions">
+          <button class="btn success" id="modalStartBtn" style="width:100%;">🚩 이 대상물 점검 시작하기 →</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
 
   <div class="footer-note" style="margin-top:20px;">불량내역·사진대장·공사사진대장은 팀 공유 저장소에 저장되어 같은 링크로 접속한 팀원 모두에게 공유됩니다(공유 링크가 아닌, 내 컴퓨터에 저장한 파일을 직접 열면 나에게만 저장되고 공유되지 않습니다).</div>
 </main>
@@ -526,8 +724,9 @@ window.onerror = function(msg, url, line, col, err){
     <div class="qgrid">
       <div class="qitem" data-target="photolog"><span class="ic">📷</span>사진대장 촬영</div>
       <div class="qitem" data-target="defect"><span class="ic">🛠</span>불량내역 입력</div>
-      <div class="qitem disabled"><span class="ic">📝</span>점검 보고서 작성<br><span style="font-size:10px;">(준비 중)</span></div>
+      <div class="qitem" data-target="schedule"><span class="ic">📅</span>일정 대시보드</div>
       <div class="qitem" data-target="buildingdetail"><span class="ic">🏢</span>대상물 상세보기</div>
+      <div class="qitem disabled"><span class="ic">📝</span>점검 보고서 작성<br><span style="font-size:10px;">(준비 중)</span></div>
     </div>
     <button class="sheet-close" id="sheetClose">닫기</button>
   </div>
@@ -706,6 +905,14 @@ async function storageDelete(key, shared){
   const res = await callAppsScript({ action:'delete', key, shared: !!shared });
   return res;
 }
+// [v52] 여러 키를 한 번의 호출로 지운다(백엔드 V03의 'deleteMany' 액션 필요).
+// 건별로 storageDelete를 반복 호출하면 시트가 커질수록 느려지고, 여러 요청이 겹치면
+// 행 번호가 밀려 엉뚱한 행이 지워질 위험도 있어 이 방식으로 바꿨다.
+async function storageDeleteMany(keys, shared){
+  if(!keys || !keys.length) return 0;
+  const res = await callAppsScript({ action:'deleteMany', keys, shared: !!shared });
+  return (res && res.deletedCount) || 0;
+}
 async function storageList(prefix, shared){
   const res = await callAppsScript({ action:'list', prefix: prefix||'', shared: !!shared });
   return { keys: (res && res.keys) || [] };
@@ -852,6 +1059,43 @@ function compressImage(file){
 
 // ---------------- 라우터 / 헤더 ----------------
 // 혁신소방 2026년 7월 실제 점검 일정 (실시결과점검표분석_20260418_1914.xlsx 기준 대상물)
+// ---------------- [v47] 일정관리 대시보드 연동 ----------------
+// 대시보드(혁신소방_일정관리대시보드)가 같은 팀 공유 저장소(shared:true)의 'schedule:' 접두어 아래에
+// 저장해둔 일정을 이 화면(홈)에서도 그대로 읽어와, "이번주 TODO"가 대시보드와 항상 같은 데이터를 본다.
+function pad2(n){ return String(n).padStart(2,'0'); }
+function toISO(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+function fromISO(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+function addDays(iso, n){ const d = fromISO(iso); d.setDate(d.getDate()+n); return toISO(d); }
+function scheduleEntryEndDate(e){ return addDays(e.startDate, (e.duration||1)-1); }
+function weekMondayOf(offset){
+  const t = new Date();
+  const dow = t.getDay();
+  const mondayDiff = (dow===0 ? -6 : 1-dow);
+  return new Date(t.getFullYear(), t.getMonth(), t.getDate()+mondayDiff+(offset||0)*7);
+}
+// 7단계 진척 상태 — 화면 배지/셀렉트박스에서 공통으로 쓰는 정의(대시보드와 동일 값 사용, 파일이 달라 중복 정의).
+const STATUS_STAGES = [
+  { key:'wait',         label:'미점검',            color:'#b3261e', bg:'#fdecea' },
+  { key:'field_done',   label:'점검완료',          color:'#8a6d00', bg:'#fff7d6' },
+  { key:'reviewed',     label:'보고서 검수완료',   color:'#6b3d20', bg:'#f1e3da' },
+  { key:'sent_client',  label:'관계인 송부',       color:'#2f6fed', bg:'#e7eefc' },
+  { key:'submitted_fd', label:'소방서 제출확인',   color:'#7b2fed', bg:'#efe6fc' },
+  { key:'fixing',       label:'불량수정공사',      color:'#c9701a', bg:'#fdecd6' },
+  { key:'closed',       label:'최종검사종료',      color:'#1fae6a', bg:'#e4f6ec' },
+];
+function statusStage(key){ return STATUS_STAGES.find(s=>s.key===key) || STATUS_STAGES[0]; }
+
+let scheduleEntries = [];
+async function loadScheduleEntries(){
+  try{ scheduleEntries = await storageGetMany('schedule:', true); }
+  catch(e){ scheduleEntries = []; }
+  if(currentView==='home') renderHome();
+}
+async function saveScheduleEntry(entry){
+  try{ await storageSet('schedule:'+entry.id, JSON.stringify(entry), true); }
+  catch(e){ showToast('저장 실패 (동기화 안 됨) - 다시 시도해주세요'); }
+}
+
 const SAMPLE_BUILDINGS = [
   {name:'화정초등학교', sub:'종합점검 · 07-20 예정'},
   {name:'꽃바위유치원', sub:'작동점검 · 07-20 예정'},
@@ -861,6 +1105,9 @@ const SAMPLE_BUILDINGS = [
   {name:'고헌중학교', sub:'작동점검 · 07-23 예정'},
   {name:'중앙중학교', sub:'작동점검 · 07-24 예정'}
 ];
+// [v47] 위 SAMPLE_BUILDINGS는 화정초~중앙중학교 현장테스트용 하드코딩 목록으로, 그 테스트는
+// 완료되었다. 이제 홈 화면은 이 목록을 직접 보여주지 않고(코드는 참고용으로 남겨둠),
+// 아래 renderHome()에서 scheduleEntries(대시보드 일정) 기반으로 다시 만든다.
 let currentBuilding = '';
 // [v31] 점검회차 개념 — 대상물+날짜+점검종류로 고유id를 만들어, 그날 그 대상물에 기록하는
 // 불량내역/사진/공사사진에 함께 태깅한다. 나중에 "이번 달 작동점검분만 모아보기" 같은 취합이
@@ -891,7 +1138,7 @@ function ensureInspectionSession(building){
 function renderInspectionBadge(){
   const el = $('inspectionBadge');
   if(!el) return;
-  if(currentView === 'home' || !currentBuilding){ el.style.display = 'none'; return; }
+  if(currentView === 'home' || currentView === 'schedule' || !currentBuilding){ el.style.display = 'none'; return; }
   el.style.display = 'flex';
   if(currentInspectionType){
     el.innerHTML = `<span>🗂 점검종류: <b>${currentInspectionType}</b> (${currentInspectionDate})</span><span class="chg" id="inspectionChangeBtn">변경</span>`;
@@ -921,11 +1168,18 @@ $('inspectionTypeChips').querySelectorAll('.chip').forEach(el=>{
 let currentView = 'home';
 
 function setHeader(){
-  const titles = { home:['혁신소방 현장테스트','홈'], defect:[currentBuilding||'(대상물 미선택)','🛠 불량내역 입력'], photolog:[currentBuilding||'(대상물 미선택)','📷 점검·공사 사진대장'], buildingdetail:[currentBuilding||'(대상물 미선택)','🏢 대상물 상세보기'] };
+  const titles = { home:['혁신소방 현장테스트','홈'], defect:[currentBuilding||'(대상물 미선택)','🛠 불량내역 입력'], photolog:[currentBuilding||'(대상물 미선택)','📷 점검·공사 사진대장'], buildingdetail:[currentBuilding||'(대상물 미선택)','🏢 대상물 상세보기'], schedule:['소방점검 일정 대시보드','📅 월간 달력 · 드래그로 날짜 변경'] };
   $('headerTitle').textContent = titles[currentView][0];
   $('headerSub').textContent = titles[currentView][1];
   const icons = $('headerIcons');
   icons.innerHTML = '';
+  // [v48] 일정 대시보드로 바로 가는 📅 아이콘 — 대시보드 자체를 보고 있을 땐 안 보여줌(중복 방지).
+  if(currentView !== 'schedule'){
+    const cal = document.createElement('button');
+    cal.className = 'icon-btn accent'; cal.textContent = '📅'; cal.title='일정 대시보드';
+    cal.onclick = ()=> goTo('schedule');
+    icons.appendChild(cal);
+  }
   if(currentView !== 'home'){
     const home = document.createElement('button');
     home.className = 'icon-btn'; home.textContent = '🏠'; home.title='홈으로';
@@ -948,6 +1202,7 @@ function goTo(view){
   if(view==='defect') loadDefectEntries();
   else if(view==='photolog'){ loadPhotoEntries(); loadConstructionEntries(); }
   else if(view==='buildingdetail') Promise.all([loadDefectEntries(), loadBuildingEdits(currentBuilding)]).then(renderBuildingDetail);
+  else if(view==='schedule') loadScheduleEntries().then(sdRenderAll);
 }
 
 function openQuickMenu(){
@@ -1499,10 +1754,87 @@ function buildingSortKey(sub){
   const m = (sub||'').match(/(\d{2})-(\d{2})/);
   return m ? (m[1]+m[2]) : '99999';
 }
+// [v47] 일정 연동 홈 섹션 — 오늘 이미 시작된(startDate<=오늘) 대상물 중 '최종검사종료'가 아닌 것만 보여준다.
+// 아직 시작일이 안 된 일정은 안 보이다가(하루하루 지나면서 하나씩 나타남), 상태를 '최종검사종료'로
+// 바꾸면 다음 렌더부터 목록에서 사라진다(진행중 대상물만 계속 눈에 보이게).
+// [v49] "하루하루 지나면서 나타난다"는 원래 요구를, 실제로는 이번 주 전체를 한눈에 봐야 하는
+// 현장 상황에 맞춰 "이번 주(월~일) 안에 속하는 일정 전체"로 바꿨다(완료 처리해야 사라짐은 그대로 유지).
+function activeScheduleForHome(){
+  const monday = weekMondayOf(0);
+  const sunday = new Date(monday); sunday.setDate(monday.getDate()+6);
+  const weekStartIso = toISO(monday), weekEndIso = toISO(sunday);
+  return scheduleEntries
+    .filter(e => (e.status||'wait') !== 'closed' && e.startDate <= weekEndIso && scheduleEntryEndDate(e) >= weekStartIso)
+    .sort((a,b)=> a.startDate<b.startDate?-1:(a.startDate>b.startDate?1:0));
+}
+function renderProgressBar(entries, containerId){
+  const el = $(containerId);
+  if(!entries.length){ el.innerHTML = `<div style="color:var(--muted);font-size:12.5px;">표시할 일정이 없습니다.</div>`; return; }
+  const counts = {}; STATUS_STAGES.forEach(s=>counts[s.key]=0);
+  entries.forEach(e=> counts[e.status||'wait']++ );
+  const total = entries.length;
+  const closedCount = counts['closed']||0;
+  const bar = STATUS_STAGES.map(s=>{
+    const pct = total ? (counts[s.key]/total*100) : 0;
+    return pct ? `<div class="seg" style="width:${pct}%;background:${s.color};" title="${s.label} ${counts[s.key]}건"></div>` : '';
+  }).join('');
+  const legend = STATUS_STAGES.map(s=>`<span><span class="dot" style="background:${s.color};"></span>${s.label} ${counts[s.key]}</span>`).join('');
+  el.innerHTML = `
+    <div class="progress-summary">진척률 — 최종검사종료 ${closedCount}/${total}건 (${total?Math.round(closedCount/total*100):0}%)</div>
+    <div class="progress-bar">${bar}</div>
+    <div class="progress-legend">${legend}</div>`;
+}
+function renderScheduleHome(){
+  const activeEntries = activeScheduleForHome();
+  renderProgressBar(activeEntries, 'scheduleProgressCard');
+  const list = $('scheduleHomeList'); list.innerHTML='';
+  if(!activeEntries.length){
+    list.innerHTML = `<div class="home-item" style="justify-content:center;color:var(--muted);">이번 주(월~일) 일정이 없습니다.<br>일정관리 대시보드에서 엑셀 업로드 또는 새 일정을 등록해주세요.</div>`;
+    return;
+  }
+  const todayIso = toISO(new Date());
+  activeEntries.forEach(e=>{
+    const st = statusStage(e.status||'wait');
+    const daysSinceEnd = Math.round((fromISO(todayIso) - fromISO(scheduleEntryEndDate(e))) / 86400000);
+    let warn = '';
+    if(e.status==='reviewed' && daysSinceEnd > 10) warn = `<span class="overdue-warn">⚠ 송부 지연(점검 후 ${daysSinceEnd}일)</span>`;
+    if(e.status==='sent_client' && e.statusChangedAt){
+      const daysSinceSent = Math.round((Date.now()-e.statusChangedAt)/86400000);
+      if(daysSinceSent > 5) warn = `<span class="overdue-warn">⚠ 제출 지연(송부 후 ${daysSinceSent}일)</span>`;
+    }
+    const div = document.createElement('div');
+    div.className = 'home-item';
+    div.style.flexWrap = 'wrap';
+    div.innerHTML = `
+      <div style="flex:1;min-width:0;">
+        <div class="name">${e.building}</div>
+        <div class="sub">${e.type||''} · ${e.startDate}${e.duration>1?`~${scheduleEntryEndDate(e)}`:''} · ${e.district?e.district+' · ':''}${e.team||''}</div>
+        <span class="status-badge" style="background:${st.bg};color:${st.color};">${st.label}</span>${warn}
+        <br>
+        <select class="status-select" data-id="${e.id}">
+          ${STATUS_STAGES.map(s=>`<option value="${s.key}" ${s.key===(e.status||'wait')?'selected':''}>${s.label}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn-secondary start-btn" style="width:auto;margin:0;padding:10px 16px;flex-shrink:0;">점검 시작</button>`;
+    div.querySelector('.start-btn').onclick = ()=> startInspection(e.building);
+    div.querySelector('.status-select').onchange = async (ev)=>{
+      const newStatus = ev.target.value;
+      if(newStatus !== e.status) e.statusChangedAt = Date.now();
+      e.status = newStatus;
+      await saveScheduleEntry(e);
+      renderScheduleHome();
+      showToast(`${e.building} 진척상태: ${statusStage(newStatus).label}`);
+    };
+    list.appendChild(div);
+  });
+}
 function renderHome(){
+  renderScheduleHome();
   const list = $('homeList'); list.innerHTML='';
   const customList = Object.entries(uiPrefs.customBuildings||{}).map(([id,b])=>({id, name:b.name, sub:b.sub, custom:true}));
-  const all = [...SAMPLE_BUILDINGS, ...customList].sort((a,b)=> buildingSortKey(a.sub).localeCompare(buildingSortKey(b.sub)));
+  // [v47] SAMPLE_BUILDINGS(화정초~중앙중학교 하드코딩)는 현장테스트가 끝났으므로 더는 홈에 표시하지 않는다.
+  // 수기로 추가한(customBuildings) 목록만 이 영역에 남긴다.
+  const all = customList.sort((a,b)=> buildingSortKey(a.sub).localeCompare(buildingSortKey(b.sub)));
   all.forEach(b=>{
     const div = document.createElement('div');
     div.className = 'home-item';
@@ -2751,6 +3083,7 @@ function renderDefectChips(){
 }
 
 // ---- 음성입력 (상세위치) ----
+$('detailLocationClearBtn').onclick = ()=>{ $('detailLocation').value=''; $('detailLocation').focus(); };
 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 $('micBtn').onclick = ()=>{
   if(!SpeechRec){ showToast('이 브라우저는 음성입력을 지원하지 않습니다. 직접 입력해주세요'); return; }
@@ -3854,6 +4187,20 @@ $('photoExportXlsxBtn').onclick = async ()=>{
     filenamePrefix: '점검사진대장',
   });
 };
+// [v49 신규] 기타 보관용 사진 — PDF(인쇄)뿐 아니라 엑셀로도 뽑을 수 있게 함(사진대장과 같은 양식 재사용).
+$('otherPhotoExportXlsxBtn').onclick = async ()=>{
+  const selected = photoEntries.filter(e=>e.include && e.group==='other' && e.building===currentBuilding);
+  if(!selected.length){ showToast('선택된 기타 보관용 사진이 없습니다'); return; }
+  const pairs = [];
+  for(let i=0;i<selected.length;i+=2) pairs.push(selected.slice(i,i+2));
+  await generateAlbumXlsx({
+    title: '기타 보관용 사진',
+    subjectName: currentBuilding,
+    headerLabel: '기타 보관용 사진',
+    pairs,
+    filenamePrefix: '기타보관용사진',
+  });
+};
 
 // ================= 공사 사진 대장 (점검 일정과는 무관하지만, [v27] 대상물별로 구분해서 기록) =================
 let constructionEntries = [];
@@ -4010,10 +4357,32 @@ function _hasEquipWithSub(building, equipName, subNames){
   if(!eq || !Array.isArray(eq.sub)) return false;
   return eq.sub.some(s => subNames.includes(s));
 }
+// [v47 버그수정] 마스터DB(203개 중 손큐레이션 7개를 뺀 나머지)는 EQUIP_DB 설비명이 뭉뚱그려져 있음
+// (예: '연기감지기'/'열감지기'로 안 나뉘고 그냥 '감지기', '피난구유도등'/'통로유도등'으로 안 나뉘고 그냥 '유도등').
+// 이 때문에 세분화된 이름만 찾던 사진대장 태그 체크가 실패해서, 실제로는 설치돼 있는데도
+// 절반 가까운 태그가 통째로 안 뜨는 버그가 있었다. 마스터DB의 뭉뚱그려진 이름도 "있는 걸로" 인정한다.
+function _hasEquipLoose(building, names){
+  const aliasMap = { '연기감지기':'감지기', '열감지기':'감지기',
+    '피난구유도등':'유도등', '복도통로유도등':'유도등', '계단통로유도등':'유도등', '거실통로유도등':'유도등' };
+  const looseNames = names.map(n=>aliasMap[n]).filter(Boolean);
+  return _hasEquip(building, names) || (looseNames.length && _hasEquip(building, looseNames));
+}
+// [v47 신규] 마스터DB 대상물은 equip[].sub가 항상 비어있어(원본 엑셀에 부속설비 상세가 없음) 기존
+// _hasPumpEquip이 절대 못 찾았다. V06에서 새로 뽑은 기기사양(entry.spec, Sheet4)에는 실제로
+// "가압송수장치" 항목(주펌프 형태·기동장치 등)이 값과 함께 들어있으므로, 이걸로도 펌프 존재를 판단한다.
+function _hasPumpSpec(building){
+  if(typeof BUILDINGS_MASTER === 'undefined' || !BUILDINGS_MASTER || !BUILDINGS_MASTER.data) return false;
+  const entry = BUILDINGS_MASTER.data[building];
+  if(!entry || !entry.spec) return false;
+  const common = entry.spec['수계소화설비(공통)'];
+  return !!(common && common['가압송수장치'] && common['가압송수장치'].length);
+}
 function _hasPumpEquip(building){
   // NESTED_PUMP_EQUIP(주펌프/충압펌프/예비펌프/엔진펌프/물올림장치/압력쳄버)가
   // 옥내소화전 또는 스프링클러의 부속설비로 하나라도 있으면 펌프성능시험 대상으로 본다.
-  return _equipListOf(building).some(e => Array.isArray(e.sub) && e.sub.some(s => NESTED_PUMP_EQUIP.includes(s)));
+  // (손큐레이션 7개 대상물 기준. 마스터DB 대상물은 아래 _hasPumpSpec으로 별도 판단.)
+  const bySub = _equipListOf(building).some(e => Array.isArray(e.sub) && e.sub.some(s => NESTED_PUMP_EQUIP.includes(s)));
+  return bySub || _hasPumpSpec(building);
 }
 
 const PHOTO_ALBUM_FIXED_1_7 = [
@@ -4021,9 +4390,9 @@ const PHOTO_ALBUM_FIXED_1_7 = [
   { label:'소화기 압력점검',        check:b=>_hasEquip(b,['분말소화기','K급소화기','자동확산소화기']) },
   { label:'수동발신기 작동점검',    check:b=>_hasEquip(b,['발신기']) },
   { label:'옥내소화전 함내점검',    check:b=>_hasEquip(b,['옥내소화전']) },
-  { label:'연기감지기 작동점검',    check:b=>_hasEquip(b,['연기감지기']) },
-  { label:'열감지기 작동점검',      check:b=>_hasEquip(b,['열감지기']) },
-  { label:'유도등 점검',            check:b=>_hasEquip(b,['피난구유도등','복도통로유도등','계단통로유도등','거실통로유도등']) },
+  { label:'연기감지기 작동점검',    check:b=>_hasEquipLoose(b,['연기감지기']) },
+  { label:'열감지기 작동점검',      check:b=>_hasEquipLoose(b,['열감지기']) },
+  { label:'유도등 점검',            check:b=>_hasEquipLoose(b,['피난구유도등','복도통로유도등','계단통로유도등','거실통로유도등']) },
 ];
 const PHOTO_ALBUM_POOL_8_10 = [
   { label:'비상조명등 점검',        check:b=>_hasEquip(b,['비상조명등','휴대용비상조명등']) },
@@ -4339,14 +4708,14 @@ async function movePhotoToTrash(id){
 function renderPhotoEntries(){
   // [v22 버그수정] 대상물을 옮기면 그 전 대상물 사진까지 같이 보이고, 심지어 미리보기/엑셀에도
   // 섞여 들어가던 문제 — 화면 표시는 반드시 currentBuilding으로 필터링한다.
-  const buildingPhotos = photoEntries.filter(e=>e.building===currentBuilding);
+  // [v49] 사진대장(보고서용)과 기타 보관용을 완전히 분리 — 이 함수는 report 그룹만 다룬다.
+  const buildingPhotos = photoEntries.filter(e=>e.building===currentBuilding && (e.group||'report')==='report');
   $('photoCount').textContent = buildingPhotos.length;
-  $('photoTrashCount').textContent = photoTrash.filter(e=>e.building===currentBuilding).length;
+  $('photoTrashCount').textContent = photoTrash.filter(e=>e.building===currentBuilding && (e.group||'report')==='report').length;
   $('photoSelectedCount').textContent = buildingPhotos.length ? `${buildingPhotos.filter(e=>e.include).length}장 선택됨` : '';
   const list = $('photoList'); list.innerHTML='';
   $('photoEmpty').style.display = buildingPhotos.length ? 'none':'block';
   buildingPhotos.slice().reverse().forEach(entry=>{
-    const group = entry.group || 'report';
     const div = document.createElement('div');
     div.className = 'entry';
     div.innerHTML = `
@@ -4354,21 +4723,56 @@ function renderPhotoEntries(){
       <img src="${entry.photo}">
       <div class="meta">
         <input type="text" class="tag-edit" data-id="${entry.id}" value="${(entry.tag||'').replace(/"/g,'&quot;')}" placeholder="${entry.tag ? '' : '⚠ 태그 없음 - 여기에 다시 입력하세요'}">
-        <div class="sub">${group==='other' ? '📁 기타보관용 · ' : ''}${entry.building||''} · ${new Date(entry.ts).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}</div>
+        <div class="sub">${entry.building||''} · ${new Date(entry.ts).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}</div>
       </div>
       <button class="del-btn" data-id="${entry.id}" title="삭제(휴지통으로)">🗑</button>
     `;
     list.appendChild(div);
   });
   list.querySelectorAll('.incl-cb').forEach(cb=>{
-    cb.onchange = async ()=>{ const en = photoEntries.find(e=>e.id===cb.dataset.id); en.include = cb.checked; await savePhotoEntry(en); $('photoSelectedCount').textContent = buildingPhotos.length ? `${photoEntries.filter(e=>e.building===currentBuilding && e.include).length}장 선택됨` : ''; };
+    cb.onchange = async ()=>{ const en = photoEntries.find(e=>e.id===cb.dataset.id); en.include = cb.checked; await savePhotoEntry(en); $('photoSelectedCount').textContent = buildingPhotos.length ? `${photoEntries.filter(e=>e.building===currentBuilding && (e.group||'report')==='report' && e.include).length}장 선택됨` : ''; };
   });
   list.querySelectorAll('.tag-edit').forEach(inp=>{
     inp.onchange = async ()=>{ const en = photoEntries.find(e=>e.id===inp.dataset.id); en.tag = inp.value.trim() || en.tag; await savePhotoEntry(en); };
   });
   list.querySelectorAll('.del-btn').forEach(btn=>{
     btn.onclick = async ()=>{
-      // [v24 변경] 예전엔 바로 완전삭제였는데, 이제 휴지통으로 보내서 복원 가능하게 한다.
+      await movePhotoToTrash(btn.dataset.id);
+      showToast('휴지통으로 옮겼습니다 (복원 가능)');
+    };
+  });
+  renderOtherPhotoEntries();
+}
+// [v49 신규] 기타 보관용 사진 — 사진대장(report)과 완전히 분리된 목록/버튼으로 표시한다.
+// (저장은 여전히 같은 photoEntries 배열/'photo:' 저장소를 쓰지만 group==='other'만 걸러서
+//  화면·내보내기 전부 따로 다뤄, 사용자 입장에서는 완전히 별개 기능처럼 동작한다.)
+function renderOtherPhotoEntries(){
+  const otherPhotos = photoEntries.filter(e=>e.building===currentBuilding && e.group==='other');
+  $('otherPhotoCount').textContent = otherPhotos.length;
+  const list = $('otherPhotoList'); list.innerHTML='';
+  $('otherPhotoEmpty').style.display = otherPhotos.length ? 'none':'block';
+  otherPhotos.slice().reverse().forEach(entry=>{
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.innerHTML = `
+      <input type="checkbox" data-id="${entry.id}" class="incl-cb-other" ${entry.include?'checked':''}>
+      <img src="${entry.photo}">
+      <div class="meta">
+        <input type="text" class="tag-edit-other" data-id="${entry.id}" value="${(entry.tag||'').replace(/"/g,'&quot;')}" placeholder="${entry.tag ? '' : '⚠ 태그 없음'}">
+        <div class="sub">${entry.building||''} · ${new Date(entry.ts).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}</div>
+      </div>
+      <button class="del-btn-other" data-id="${entry.id}" title="삭제(휴지통으로)">🗑</button>
+    `;
+    list.appendChild(div);
+  });
+  list.querySelectorAll('.incl-cb-other').forEach(cb=>{
+    cb.onchange = async ()=>{ const en = photoEntries.find(e=>e.id===cb.dataset.id); en.include = cb.checked; await savePhotoEntry(en); };
+  });
+  list.querySelectorAll('.tag-edit-other').forEach(inp=>{
+    inp.onchange = async ()=>{ const en = photoEntries.find(e=>e.id===inp.dataset.id); en.tag = inp.value.trim() || en.tag; await savePhotoEntry(en); };
+  });
+  list.querySelectorAll('.del-btn-other').forEach(btn=>{
+    btn.onclick = async ()=>{
       await movePhotoToTrash(btn.dataset.id);
       showToast('휴지통으로 옮겼습니다 (복원 가능)');
     };
@@ -4554,17 +4958,465 @@ $('defectSyncBtn').onclick = async ()=>{ showToast('동기화 중...'); await lo
 $('photoSyncBtn').onclick = async ()=>{ showToast('동기화 중...'); await loadPhotoEntries(); showToast('동기화 완료'); };
 $('constructionSyncBtn').onclick = async ()=>{ showToast('동기화 중...'); await loadConstructionEntries(); showToast('동기화 완료'); };
 // 지금 보고 있는 화면 데이터를 주기적으로 자동으로 다시 불러와, 팀원이 방금 올린 항목이 반영되게 함
+let scheduleBusy = false; // [v52] 초기화/임포트가 진행 중일 때는 20초 주기 새로고침이 끼어들어 뒤섞이지 않게 막는 플래그
 setInterval(()=>{
-  if(document.hidden) return;
+  if(document.hidden || scheduleBusy) return;
   if(currentView==='defect') loadDefectEntries();
   else if(currentView==='photolog') loadPhotoEntries();
   else if(currentView==='construction') loadConstructionEntries();
+  else if(currentView==='home') loadScheduleEntries();
+  else if(currentView==='schedule') loadScheduleEntries().then(sdRenderAll);
 }, 20000);
+
+// ==================================================================================
+// [v48] 아래는 원래 별도 파일이던 "혁신소방_일정관리대시보드"의 로직이다. 병합하면서
+// $ / showToast / storageSet·Delete·GetMany / toISO·fromISO·addDays·pad2 / STATUS_STAGES·statusStage /
+// scheduleEntries·loadScheduleEntries 는 위에 이미 있는 것을 그대로 재사용하도록 중복 정의를 모두 제거했다.
+// (같은 이름을 script 안에서 두 번 선언하면 문법 오류가 나기 때문에 반드시 지워야 했음.)
+// ==================================================================================
+const DOW_KR = ['일','월','화','수','목','금','토'];
+
+function excelSerialToDate(serial){
+  // 엑셀(1900 날짜체계) 시리얼 번호 -> JS Date. 1899-12-30을 기준일로 계산(엑셀의 1900 윤년 버그 포함 보정값).
+  return new Date(Date.UTC(1899,11,30) + Math.round(Number(serial))*86400000);
+}
+function dateToExcelSerial(iso){
+  const d = fromISO(iso);
+  return Math.round((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()) - Date.UTC(1899,11,30)) / 86400000);
+}
+
+let LIMIT = { 종합점검: 10000, 작동점검: 12500 };
+function entriesOnDate(iso){
+  return scheduleEntries.filter(e => iso >= e.startDate && iso <= scheduleEntryEndDate(e));
+}
+async function removeScheduleEntry(id){ await storageDelete('schedule:'+id, true); }
+
+// ---- 엑셀 업로드(가져오기) ----
+function cleanBuildingName(raw){
+  // [v51] "8,2 울산여고"(쉼표)뿐 아니라 "1.7 중산현대아파트"(마침표) 표기도 나오는 걸 확인했다.
+  // 이 접두어를 못 지우면 "1.7 중산현대아파트"라는 완전히 다른 이름으로 저장되어 마스터DB와
+  // 매칭이 안 되고(대상물 정보가 통째로 안 나타남), 대신 EQUIP_DB 등이 비어버리는 문제로 이어진다.
+  return String(raw||'').replace(/^\d+\s*[,.]\s*\d+\s+/, '').trim();
+}
+async function parseScheduleXlsx(file){
+  const buf = await file.arrayBuffer();
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buf);
+  let targetWs = null, headerRow = null;
+  for(const ws of wb.worksheets){
+    for(let r=1; r<=Math.min(ws.rowCount,5); r++){
+      const vals = (ws.getRow(r).values||[]).map(v=>(v==null?'':String(v).replace(/\s/g,'')));
+      if(vals.includes('대상물명') && vals.includes('시작일')){ targetWs = ws; headerRow = r; break; }
+    }
+    if(targetWs) break;
+  }
+  if(!targetWs) throw new Error('"시작일"/"대상물명" 열이 있는 시트를 찾지 못했습니다. 양식을 확인해주세요');
+  const colMap = {};
+  targetWs.getRow(headerRow).eachCell((cell, colNumber)=>{
+    const v = (cell.value==null?'':cell.value.toString()).replace(/\s/g,'');
+    if(v==='시작일') colMap.start = colNumber;
+    else if(v==='기간(일)') colMap.duration = colNumber;
+    else if(v==='수행팀') colMap.team = colNumber;
+    else if(v==='점검유형') colMap.type = colNumber;
+    else if(v==='대상물명') colMap.building = colNumber;
+    else if(v==='LL1') colMap.district = colNumber;
+    else if(v.includes('면적')) colMap.area = colNumber;
+    else if(v==='비고') colMap.note = colNumber;
+  });
+  if(!colMap.start || !colMap.building) throw new Error('시작일/대상물명 열을 찾지 못했습니다');
+  const entries = [];
+  targetWs.eachRow((row, rowNumber)=>{
+    if(rowNumber <= headerRow) return;
+    const startCell = row.getCell(colMap.start).value;
+    const buildingRaw = row.getCell(colMap.building).value;
+    if(!startCell || !buildingRaw) return;
+    let startIso;
+    if(startCell instanceof Date) startIso = toISO(startCell);
+    else if(typeof startCell === 'number') startIso = toISO(excelSerialToDate(startCell));
+    else return;
+    entries.push({
+      id: 'sch_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      building: cleanBuildingName(buildingRaw),
+      type: colMap.type ? (String(row.getCell(colMap.type).value||'종합점검').trim()) : '종합점검',
+      team: '점검1팀', // [v49] 현재는 팀이 하나뿐이라 엑셀의 수행팀 칼럼 값과 무관하게 고정
+      district: colMap.district ? String(row.getCell(colMap.district).value||'').trim() : '',
+      area: colMap.area ? Number(row.getCell(colMap.area).value)||0 : 0,
+      startDate: startIso,
+      duration: colMap.duration ? (Number(row.getCell(colMap.duration).value)||1) : 1,
+      note: colMap.note ? String(row.getCell(colMap.note).value||'').trim() : '',
+      status: 'wait',
+    });
+  });
+  return entries;
+}
+$('xlsxPickBtn').onclick = ()=> $('xlsxFileInput').click();
+// [v52] 오늘 이후(미래) 일정을 한 번의 백엔드 호출로 안전하게 지운다. 예전엔 건별로 순차/병렬
+// 호출했는데, 순차는 느리고(64건이면 수십 초) 병렬은 시트 행번호가 밀려 엉뚱한 행이 지워질
+// 위험이 있었다(참소방_GoogleAppsScript_백엔드_V03의 'deleteMany' 참고). 반드시 그 백엔드가
+// 배포돼 있어야 한다 — 옛 백엔드(V02 이하)면 이 호출이 실패하고 아래 폴백으로 넘어간다.
+async function resetFutureSchedule(onProgress){
+  const todayIso = toISO(new Date());
+  const toRemove = scheduleEntries.filter(e2 => e2.startDate >= todayIso);
+  if(!toRemove.length) return 0;
+  const keys = toRemove.map(r=>'schedule:'+r.id);
+  const deletedCount = await storageDeleteMany(keys, true);
+  if(deletedCount === 0){
+    // [폴백] 백엔드가 아직 V03(deleteMany)로 안 올라간 경우 — 건별 순차 삭제로 대체(느리지만 안전).
+    let done = 0;
+    for(const r of toRemove){ await removeScheduleEntry(r.id); done++; if(onProgress) onProgress(done, toRemove.length); }
+  } else if(onProgress){
+    onProgress(toRemove.length, toRemove.length);
+  }
+  scheduleEntries = scheduleEntries.filter(e2 => e2.startDate < todayIso);
+  return toRemove.length;
+}
+$('scheduleResetBtn').onclick = async ()=>{
+  const todayIso = toISO(new Date());
+  const willRemove = scheduleEntries.filter(e2 => e2.startDate >= todayIso).length;
+  if(!willRemove){ showToast('오늘 이후로 예정된 일정이 없어 초기화할 게 없습니다'); return; }
+  if(!confirm(`오늘(${todayIso}) 이후로 예정된 일정 ${willRemove}건을 전부 지웁니다. 이미 지난 날짜의 일정은 그대로 남습니다.\n(건수가 많으면 몇 초 정도 걸릴 수 있습니다 — 버튼에 진행 상황이 표시됩니다)\n계속할까요?`)) return;
+  const btn = $('scheduleResetBtn');
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  scheduleBusy = true;
+  try{
+    const n = await resetFutureSchedule((done,total)=>{ btn.textContent = `🔄 초기화 중... (${done}/${total})`; });
+    sdRenderAll();
+    showToast(`${n}건 초기화 완료 — 이제 엑셀을 다시 올려주세요`);
+  }catch(err){
+    showToast('초기화 중 오류가 발생했습니다: ' + err.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+    scheduleBusy = false;
+  }
+};
+$('xlsxFileInput').onchange = async (e)=>{
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  $('xlsxFileName').textContent = file.name;
+  showToast('엑셀을 읽는 중...');
+  let entries;
+  try{ entries = await parseScheduleXlsx(file); }
+  catch(err){ showToast('엑셀을 읽지 못했습니다: ' + err.message); return; }
+  if(!entries.length){ showToast('엑셀에서 불러올 일정을 찾지 못했습니다'); return; }
+  // [v49] 같은 대상물명이 여러 번 나오면(재업로드 등) 가장 최근(시작일이 늦은) 1건만 남긴다.
+  const byName = {};
+  entries.forEach(en=>{ if(!byName[en.building] || byName[en.building].startDate < en.startDate) byName[en.building] = en; });
+  const deduped = Object.values(byName);
+  if(!confirm(`${deduped.length}건의 일정을 불러옵니다 (원본 ${entries.length}행 중 대상물명 중복은 최신 것만 채택).\n오늘(${toISO(new Date())}) 이후로 예정된 기존 일정은 전부 지우고 이걸로 교체됩니다 — 이미 지난 날짜의 일정은 그대로 보존됩니다.\n(건수가 많으면 몇 초 걸릴 수 있습니다)\n계속할까요?`)) return;
+  const importBtn = $('xlsxExportBtn'); // 진행 표시는 파일선택 라벨 자리에 함
+  scheduleBusy = true;
+  try{
+    const removedCount = await resetFutureSchedule((done,total)=>{ $('xlsxFileName').textContent = `정리 중... (${done}/${total})`; });
+    let saved = 0;
+    for(let i=0; i<deduped.length; i+=8){
+      const chunk = deduped.slice(i, i+8);
+      await Promise.all(chunk.map(en=>{ scheduleEntries.push(en); return saveScheduleEntry(en); }));
+      saved += chunk.length;
+      $('xlsxFileName').textContent = `업로드 중... (${saved}/${deduped.length})`;
+    }
+    sdRenderAll();
+    $('xlsxFileName').textContent = file.name;
+    showToast(`${deduped.length}건 불러오기 완료 (팀원과 공유됨, 지난 일정 ${removedCount}건 정리)`);
+  }catch(err){
+    showToast('불러오는 중 오류가 발생했습니다: ' + err.message);
+  }finally{
+    scheduleBusy = false;
+  }
+};
+
+// ---- 엑셀 내보내기 ----
+$('xlsxExportBtn').onclick = async ()=>{
+  if(typeof ExcelJS === 'undefined'){ showToast('엑셀 라이브러리 로드 실패 — 인터넷 연결을 확인해주세요'); return; }
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('일정리스트');
+  ws.addRow(['시작일','요일','기간(일)','종료일','수행팀','점검유형','대상물명','LL1','면적(㎡)','비고']);
+  scheduleEntries.slice().sort((a,b)=>a.startDate<b.startDate?-1:1).forEach(e=>{
+    const start = fromISO(e.startDate);
+    ws.addRow([ dateToExcelSerial(e.startDate), DOW_KR[start.getDay()], e.duration||1, dateToExcelSerial(scheduleEntryEndDate(e)), e.team, e.type, e.building, e.district, e.area, e.note ]);
+  });
+  ws.columns.forEach(c=>c.width=14);
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download = `소방점검_일정_${toISO(new Date())}.xlsx`; a.click();
+  URL.revokeObjectURL(url);
+  showToast('엑셀로 내보냈습니다');
+};
+
+// ---- 일자별 한도(용량) 체크 ----
+function capacityForDate(iso){
+  const items = entriesOnDate(iso);
+  const sum = { 종합점검:0, 작동점검:0 };
+  items.forEach(e=>{ sum[e.type] = (sum[e.type]||0) + (Number(e.area)||0); });
+  return {
+    jonghap: sum['종합점검']||0, jakdong: sum['작동점검']||0,
+    overJonghap: (sum['종합점검']||0) > LIMIT.종합점검,
+    overJakdong: (sum['작동점검']||0) > LIMIT.작동점검,
+  };
+}
+
+// ---- 달력 렌더 ----
+let calYear, calMonth;
+(function initCalDate(){ const t = new Date(); calYear = t.getFullYear(); calMonth = t.getMonth(); })();
+function renderDow(){
+  const el = $('calDow'); el.innerHTML='';
+  DOW_KR.forEach((d,i)=>{
+    const div = document.createElement('div');
+    div.className = 'cal-dow' + (i===0?' sun':i===6?' sat':'');
+    div.textContent = d;
+    el.appendChild(div);
+  });
+}
+function renderCalendar(){
+  $('calTitle').textContent = `${calYear}년 ${pad2(calMonth+1)}월`;
+  const grid = $('calGrid'); grid.innerHTML='';
+  const firstDay = new Date(calYear, calMonth, 1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const daysInPrevMonth = new Date(calYear, calMonth, 0).getDate();
+  const todayIso = toISO(new Date());
+  const cells = [];
+  for(let i=0;i<startOffset;i++) cells.push({ d: daysInPrevMonth-startOffset+1+i, out:true, month: calMonth-1 });
+  for(let d=1; d<=daysInMonth; d++) cells.push({ d, out:false, month: calMonth });
+  while(cells.length % 7 !== 0 || cells.length < 35) cells.push({ d: cells.length - (startOffset+daysInMonth) + 1, out:true, month: calMonth+1 });
+  cells.forEach((c, idx)=>{
+    const dow = idx % 7;
+    let y = calYear, m = c.month;
+    if(m < 0){ y -= 1; m = 11; }
+    if(m > 11){ y += 1; m = 0; }
+    const iso = `${y}-${pad2(m+1)}-${pad2(c.d)}`;
+    const div = document.createElement('div');
+    div.className = 'cal-day' + (c.out?' out':'') + (dow===0?' sun':dow===6?' sat':'') + (iso===todayIso?' today':'');
+    div.dataset.date = iso;
+    const inner = document.createElement('div'); inner.className='cal-day-inner';
+    const dnum = document.createElement('div'); dnum.className='dnum'; dnum.textContent=c.d;
+    inner.appendChild(dnum);
+    const dayEntries = entriesOnDate(iso).filter(e=>e.startDate===iso);
+    dayEntries.forEach(e=>{
+      const chip = document.createElement('div');
+      chip.className = 'sd-chip ' + (e.type==='종합점검'?'jonghap':'jakdong');
+      const st = statusStage(e.status||'wait');
+      chip.style.borderLeft = `4px solid ${st.color}`;
+      chip.textContent = e.building + (e.duration>1 ? ` (${e.duration}일)` : '');
+      chip.title = st.label;
+      chip.draggable = true;
+      chip.dataset.id = e.id;
+      chip.addEventListener('dragstart', ev=>{ ev.dataTransfer.setData('text/plain', e.id); });
+      chip.addEventListener('click', ev=>{ ev.stopPropagation(); openEditModal(e); });
+      inner.appendChild(chip);
+    });
+    const cap = capacityForDate(iso);
+    if(cap.overJonghap || cap.overJakdong){
+      const badge = document.createElement('div'); badge.className='overbadge'; badge.textContent='⚠';
+      div.appendChild(badge);
+    }
+    div.appendChild(inner);
+    div.addEventListener('click', ()=>{ openNewModal(iso); });
+    div.addEventListener('dragover', ev=>{ ev.preventDefault(); div.classList.add('dragover'); });
+    div.addEventListener('dragleave', ()=> div.classList.remove('dragover'));
+    div.addEventListener('drop', async ev=>{
+      ev.preventDefault(); div.classList.remove('dragover');
+      const id = ev.dataTransfer.getData('text/plain');
+      const entry = scheduleEntries.find(x=>x.id===id);
+      if(!entry) return;
+      if(entry.startDate === iso) return;
+      entry.startDate = iso;
+      await saveScheduleEntry(entry);
+      sdRenderAll();
+      showToast(`${entry.building} 일정을 ${iso}로 이동했습니다`);
+    });
+    grid.appendChild(div);
+  });
+}
+$('prevMonthBtn').onclick = ()=>{ calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCalendar(); };
+$('nextMonthBtn').onclick = ()=>{ calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCalendar(); };
+
+// ---- 요약 카드 + 진척률 카드 ----
+function renderSummary(){
+  const monthPrefix = `${calYear}-${pad2(calMonth+1)}`;
+  const inMonth = scheduleEntries.filter(e=>e.startDate.startsWith(monthPrefix));
+  $('sumAll').textContent = inMonth.length + '건';
+  $('sumJonghap').textContent = inMonth.filter(e=>e.type==='종합점검').length + '건';
+  $('sumJakdong').textContent = inMonth.filter(e=>e.type==='작동점검').length + '건';
+  renderProgressCard(inMonth);
+}
+function renderProgressCard(entries){
+  const el = $('progressCard');
+  if(!entries.length){ el.innerHTML = `<div style="color:var(--muted);font-size:13px;">이 달에는 일정이 없습니다.</div>`; return; }
+  const counts = {}; STATUS_STAGES.forEach(s=>counts[s.key]=0);
+  entries.forEach(e=> counts[e.status||'wait']++ );
+  const total = entries.length;
+  const closedCount = counts['closed']||0;
+  const bar = STATUS_STAGES.map(s=>{
+    const pct = total ? (counts[s.key]/total*100) : 0;
+    return pct ? `<div class="seg" style="width:${pct}%;background:${s.color};" title="${s.label} ${counts[s.key]}건"></div>` : '';
+  }).join('');
+  const legend = STATUS_STAGES.map(s=>`<span><span class="dot" style="background:${s.color};"></span>${s.label} ${counts[s.key]}</span>`).join('');
+  el.innerHTML = `
+    <div class="progress-summary">이 달 진척률 — 최종검사종료 ${closedCount}/${total}건 (${total?Math.round(closedCount/total*100):0}%)</div>
+    <div class="progress-bar">${bar}</div>
+    <div class="progress-legend">${legend}</div>`;
+}
+
+// ---- 주간 TODO ----
+let weekOffset = 0;
+function weekStart(offset){
+  const t = new Date();
+  const dow = t.getDay();
+  const mondayDiff = (dow===0 ? -6 : 1-dow);
+  return new Date(t.getFullYear(), t.getMonth(), t.getDate()+mondayDiff+offset*7);
+}
+function renderWeekTodo(){
+  const monday = weekStart(weekOffset);
+  const days = [...Array(7)].map((_,i)=>{ const d=new Date(monday); d.setDate(monday.getDate()+i); return d; });
+  $('weekTitle').textContent = `${weekOffset===0?'이번 주 ':''}TODO (${toISO(days[0]).slice(5)} ~ ${toISO(days[6]).slice(5)})`;
+  const body = $('weekBody'); body.innerHTML='';
+  let anyItem = false;
+  days.forEach(d=>{
+    const iso = toISO(d);
+    // [v49] entriesOnDate(기간 겹침 전체)로 뽑으면 여러 날짜짜리 일정(예: 중산현대아파트 2일)이
+    // 그 기간의 날마다 중복으로 나타났었다. 목록에는 "시작일에만 1번" 나오게 하고(기간은 옆에 표기),
+    // 한도(용량) 체크만 그 날 실제로 겹치는 전체 일정 기준(entriesOnDate)으로 그대로 계산한다.
+    const items = scheduleEntries.filter(e=>e.startDate===iso);
+    if(!items.length) return;
+    anyItem = true;
+    const cap = capacityForDate(iso);
+    const block = document.createElement('div'); block.className='week-day-block';
+    const head = document.createElement('div'); head.className='week-day-head';
+    head.innerHTML = `<span>${pad2(d.getMonth()+1)}/${pad2(d.getDate())} (${DOW_KR[d.getDay()]})</span>
+      <span class="cap ${cap.overJonghap||cap.overJakdong?'over':''}">종합 ${cap.jonghap.toLocaleString()}/${LIMIT.종합점검.toLocaleString()} · 작동 ${cap.jakdong.toLocaleString()}/${LIMIT.작동점검.toLocaleString()} ${(cap.overJonghap||cap.overJakdong)?'⚠초과':''}</span>`;
+    block.appendChild(head);
+    items.forEach(e=>{
+      const row = document.createElement('div'); row.className='week-item';
+      const st = statusStage(e.status||'wait');
+      let warn = '';
+      const daysSinceEnd = Math.round((fromISO(toISO(new Date())) - fromISO(scheduleEntryEndDate(e))) / 86400000);
+      if(e.status==='reviewed' && daysSinceEnd > 10) warn = `<span class="overdue-warn">⚠ 송부 지연 ${daysSinceEnd}일</span>`;
+      if(e.status==='sent_client' && e.statusChangedAt && Math.round((Date.now()-e.statusChangedAt)/86400000) > 5){
+        warn = `<span class="overdue-warn">⚠ 제출 지연 ${Math.round((Date.now()-e.statusChangedAt)/86400000)}일</span>`;
+      }
+      row.innerHTML = `<span class="tag ${e.type==='종합점검'?'jonghap':'jakdong'}">${e.type==='종합점검'?'종합':'작동'}</span>
+        <span class="nm">${e.building}${e.duration>1?` (${e.duration}일)`:''}</span><span class="meta">${e.district?e.district+' · ':''}${e.team||''}</span>
+        <span class="status-badge" style="background:${st.bg};color:${st.color};">${st.label}</span>${warn}`;
+      row.onclick = ()=> openEditModal(e);
+      block.appendChild(row);
+    });
+    body.appendChild(block);
+  });
+  if(!anyItem) body.innerHTML = `<div class="week-empty">이 주에는 등록된 일정이 없습니다.</div>`;
+}
+$('prevWeekBtn').onclick = ()=>{ weekOffset--; renderWeekTodo(); };
+$('nextWeekBtn').onclick = ()=>{ weekOffset++; renderWeekTodo(); };
+
+// ---- 클릭 수정 모달 ----
+let modalEntry = null;
+function openEditModal(entry){
+  modalEntry = entry;
+  $('modalTitle').textContent = '일정 수정';
+  $('fBuilding').value = entry.building;
+  $('fType').value = entry.type;
+  $('fTeam').value = entry.team||'';
+  $('fStart').value = entry.startDate;
+  $('fDuration').value = entry.duration||1;
+  $('fArea').value = entry.area||'';
+  $('fDistrict').value = entry.district||'';
+  $('fNote').value = entry.note||'';
+  $('fStatus').value = entry.status||'wait';
+  $('modalDeleteBtn').style.display = 'block';
+  $('modalOverlay').classList.add('show');
+}
+function openNewModal(iso){
+  modalEntry = null;
+  $('modalTitle').textContent = '새 일정 추가';
+  $('fBuilding').value = '';
+  $('fType').value = '종합점검';
+  $('fTeam').value = '점검1팀';
+  $('fStart').value = iso;
+  $('fDuration').value = 1;
+  $('fArea').value = '';
+  $('fDistrict').value = '';
+  $('fNote').value = '';
+  $('fStatus').value = 'wait';
+  $('modalDeleteBtn').style.display = 'none';
+  $('modalOverlay').classList.add('show');
+}
+function closeModal(){ $('modalOverlay').classList.remove('show'); modalEntry=null; }
+$('modalCancelBtn').onclick = closeModal;
+$('modalOverlay').addEventListener('click', e=>{ if(e.target.id==='modalOverlay') closeModal(); });
+$('modalSaveBtn').onclick = async ()=>{
+  const building = $('fBuilding').value.trim();
+  if(!building){ showToast('대상물명을 입력해주세요'); return; }
+  const entry = modalEntry || { id: 'sch_' + Date.now() + '_' + Math.random().toString(36).slice(2,7) };
+  entry.building = building;
+  entry.type = $('fType').value;
+  entry.team = $('fTeam').value.trim();
+  entry.startDate = $('fStart').value;
+  entry.duration = Math.max(1, Number($('fDuration').value)||1);
+  entry.area = Number($('fArea').value)||0;
+  entry.district = $('fDistrict').value.trim();
+  entry.note = $('fNote').value.trim();
+  const newStatus = $('fStatus').value;
+  if(newStatus !== entry.status) entry.statusChangedAt = Date.now();
+  entry.status = newStatus;
+  if(!modalEntry) scheduleEntries.push(entry);
+  await saveScheduleEntry(entry);
+  closeModal();
+  sdRenderAll();
+  showToast('저장했습니다 (팀원과 공유됨)');
+};
+$('modalDeleteBtn').onclick = async ()=>{
+  if(!modalEntry) return;
+  if(!confirm(`"${modalEntry.building}" 일정을 삭제할까요?`)) return;
+  scheduleEntries = scheduleEntries.filter(e=>e.id!==modalEntry.id);
+  await removeScheduleEntry(modalEntry.id);
+  closeModal();
+  sdRenderAll();
+  showToast('삭제했습니다');
+};
+// [v48] 이제 같은 파일이므로 새 창을 열 필요 없이, 이 화면(현장테스트)의 기존 startInspection()을
+// 바로 호출해서 그 대상물 점검으로 곧장 넘어간다.
+$('modalStartBtn').onclick = ()=>{
+  const name = $('fBuilding').value.trim();
+  if(!name){ showToast('대상물명을 입력해주세요'); return; }
+  closeModal();
+  startInspection(name);
+};
+$('addEntryBtn').onclick = ()=> openNewModal(toISO(new Date()));
+
+// ---- 한도 설정 ----
+// [v51] 일자별 한도(LIMIT)는 이제 화면에 노출하지 않고 코드 안 고정값(종합 10,000㎡/일, 작동 12,500㎡/일)만 쓴다.
+// (사용자가 이미 다 아는 값이라 UI로 보여줄 필요가 없다는 요청 반영 — 필요해지면 이 LIMIT 값만 고치면 됨)
+
+// ---- 전체 다시 그리기 ----
+function sdRenderAll(){
+  renderDow();
+  renderCalendar();
+  renderSummary();
+  renderWeekTodo();
+}
+function populateStatusSelect(){
+  $('fStatus').innerHTML = STATUS_STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join('');
+}
+populateStatusSelect();
 
 // ---------------- 초기화 ----------------
 // [v40] 하단에 현재 어느 업체 데이터로 실행 중인지 표시(여러 업체 코드로 접속을 나눠 쓰게 될 때 헷갈리지 않도록)
 if($('tenantLabel')) $('tenantLabel').textContent = (TENANT_FILES[CURRENT_TENANT_CODE]||{}).name || CURRENT_TENANT_CODE;
 // [v37] "새 일정 추가" 폼의 대상물명 자동완성 - 마스터 DB(203개) 이름 전체를 미리 채워둔다.
+// [v49] 대상물 마스터DB(203개) 파일이 실제로 로드됐는지 눈에 보이게 확인.
+// 이게 실패하면 화면상으로는 "소방시설명이 전체목록으로 다 나옴"/"대상물 상세보기가 빈 화면"처럼
+// 보여서 원인을 알기 어려우므로, 파일명을 직접 알려주는 배너를 띄운다.
+(function checkMasterDbLoaded(){
+  const el = $('masterDbWarning'); if(!el) return;
+  const expectedFile = (TENANT_FILES[CURRENT_TENANT_CODE]||{}).file || '(알 수 없음)';
+  if(typeof BUILDINGS_MASTER === 'undefined' || !BUILDINGS_MASTER || !BUILDINGS_MASTER.data){
+    el.style.display = 'block';
+    el.textContent = `⚠ 대상물 마스터DB 파일을 불러오지 못했습니다 — "${expectedFile}" 파일이 이 html과 정확히 같은 폴더에 있는지 확인해주세요. (이 상태에서는 소방시설명이 전체목록으로 나오고, 대상물 상세보기도 비어있게 표시됩니다)`;
+  }
+})();
 (function populateMasterBuildingDatalist(){
   const dl = $('masterBuildingNames'); if(!dl || typeof BUILDINGS_MASTER === 'undefined' || !BUILDINGS_MASTER || !BUILDINGS_MASTER.data) return;
   Object.keys(BUILDINGS_MASTER.data).forEach(n=>{
@@ -4577,12 +5429,18 @@ uiPrefsReady.then(()=>{
   renderHome(); // 팀 공유 저장소에서 불러온 수기 일정(customBuildings)을 반영해 다시 그림
   renderLocationSelectors();
   renderDefectChips();
+  // [v47] 일정관리 대시보드(캘린더)에서 "점검 시작 →" 버튼으로 넘어올 때 쓰는 링크 파라미터.
+  // 예: v47.html?start=울산여고 — 대시보드의 "대상물 점검 컨셉"은 그대로 이 화면(v46/v47)에
+  // 위임하고, 대시보드 자신은 일정만 관리한다.
+  const _startName = new URLSearchParams(location.search).get('start');
+  if(_startName) startInspection(_startName);
 });
 loadTags();
 loadOtherTags();
 loadDefectEntries();
 loadInspectorName();
 loadPhotoEntries();
+loadScheduleEntries(); // [v47] 대시보드 일정 로드 — 완료되면 홈이면 자동으로 다시 그림
 loadConstructionEntries();
 setHeader();
 </script>
