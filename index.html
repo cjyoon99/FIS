@@ -334,7 +334,14 @@ window.onerror = function(msg, url, line, col, err){
 
   <!-- ================= 홈 화면 ================= -->
   <div class="view active" id="view-home">
-    <div class="section-label" style="margin-top:0;">이번 주 진행중 대상물 (일정관리 대시보드 연동)</div>
+    <div class="section-label" style="margin-top:0;display:flex;justify-content:space-between;align-items:center;">
+      <span id="homeWeekTitle">이번 주 진행중 대상물 (일정관리 대시보드 연동)</span>
+      <span style="display:flex;gap:6px;flex-shrink:0;">
+        <button type="button" id="homeWeekPrevBtn" class="icon-btn" title="이전주" style="width:auto;padding:0 10px;">◀</button>
+        <button type="button" id="homeWeekTodayBtn" class="icon-btn" title="이번주로" style="width:auto;padding:0 10px;font-size:11px;">이번주</button>
+        <button type="button" id="homeWeekNextBtn" class="icon-btn" title="다음주" style="width:auto;padding:0 10px;">▶</button>
+      </span>
+    </div>
     <div class="card" id="scheduleProgressCard" style="padding:10px 12px;"></div>
     <div id="scheduleHomeList"></div>
 
@@ -1759,8 +1766,10 @@ function buildingSortKey(sub){
 // 바꾸면 다음 렌더부터 목록에서 사라진다(진행중 대상물만 계속 눈에 보이게).
 // [v49] "하루하루 지나면서 나타난다"는 원래 요구를, 실제로는 이번 주 전체를 한눈에 봐야 하는
 // 현장 상황에 맞춰 "이번 주(월~일) 안에 속하는 일정 전체"로 바꿨다(완료 처리해야 사라짐은 그대로 유지).
+// [v53] 홈 화면 전용 주간 이동 오프셋(대시보드의 weekOffset과는 별개 — 화면이 서로 다른 주를 봐도 안 섞이게).
+let homeWeekOffset = 0;
 function activeScheduleForHome(){
-  const monday = weekMondayOf(0);
+  const monday = weekMondayOf(homeWeekOffset);
   const sunday = new Date(monday); sunday.setDate(monday.getDate()+6);
   const weekStartIso = toISO(monday), weekEndIso = toISO(sunday);
   return scheduleEntries
@@ -1786,10 +1795,16 @@ function renderProgressBar(entries, containerId){
 }
 function renderScheduleHome(){
   const activeEntries = activeScheduleForHome();
+  const monday = weekMondayOf(homeWeekOffset);
+  const sunday = new Date(monday); sunday.setDate(monday.getDate()+6);
+  const rangeLabel = `${toISO(monday).slice(5)} ~ ${toISO(sunday).slice(5)}`;
+  $('homeWeekTitle').textContent = homeWeekOffset===0
+    ? `이번 주 진행중 대상물 (${rangeLabel})`
+    : `${homeWeekOffset>0?homeWeekOffset+'주 후':(-homeWeekOffset)+'주 전'} 진행중 대상물 (${rangeLabel})`;
   renderProgressBar(activeEntries, 'scheduleProgressCard');
   const list = $('scheduleHomeList'); list.innerHTML='';
   if(!activeEntries.length){
-    list.innerHTML = `<div class="home-item" style="justify-content:center;color:var(--muted);">이번 주(월~일) 일정이 없습니다.<br>일정관리 대시보드에서 엑셀 업로드 또는 새 일정을 등록해주세요.</div>`;
+    list.innerHTML = `<div class="home-item" style="justify-content:center;color:var(--muted);">${homeWeekOffset===0?'이번':'그'} 주(월~일)엔 일정이 없습니다.<br>일정관리 대시보드에서 엑셀 업로드 또는 새 일정을 등록해주세요.</div>`;
     return;
   }
   const todayIso = toISO(new Date());
@@ -1828,6 +1843,9 @@ function renderScheduleHome(){
     list.appendChild(div);
   });
 }
+$('homeWeekPrevBtn').onclick = ()=>{ homeWeekOffset--; renderScheduleHome(); };
+$('homeWeekNextBtn').onclick = ()=>{ homeWeekOffset++; renderScheduleHome(); };
+$('homeWeekTodayBtn').onclick = ()=>{ homeWeekOffset=0; renderScheduleHome(); };
 function renderHome(){
   renderScheduleHome();
   const list = $('homeList'); list.innerHTML='';
