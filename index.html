@@ -381,9 +381,12 @@ window.onerror = function(msg, url, line, col, err){
   <!-- ================= 불량내역 입력 ================= -->
   <div class="view" id="view-defect">
     <div class="card">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
-        <span id="defectXlsxImportBtn" style="color:var(--accent);font-weight:700;cursor:pointer;font-size:12px;">📥 엑셀에서 불러오기</span>
-        <input type="file" accept=".xlsx" id="defectXlsxImportInput" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+        <span id="aptAppOpenBtn" style="color:var(--accent);font-weight:700;cursor:pointer;font-size:12px;">🏢 세대별 점검 앱 열기 (아파트) →</span>
+        <span>
+          <span id="defectXlsxImportBtn" style="color:var(--accent);font-weight:700;cursor:pointer;font-size:12px;">📥 엑셀에서 불러오기</span>
+          <input type="file" accept=".xlsx" id="defectXlsxImportInput" style="display:none;">
+        </span>
       </div>
       <label style="display:flex;justify-content:space-between;align-items:center;">
         <span>위치 (동 · 층 · 상세위치)</span>
@@ -1201,15 +1204,6 @@ function setHeader(){
 }
 
 function goTo(view){
-  // [아파트형 대상물] 불량내역은 이 화면 안이 아니라, 세대별 점검 전용 앱(v5 계열)에서 진행한다.
-  if(view==='defect'){
-    const link = apartmentLinkFor(currentBuilding);
-    if(link){
-      showToast(currentBuilding + ' 세대별 점검 앱으로 이동합니다');
-      window.open(link, '_blank');
-      return;
-    }
-  }
   currentView = view;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   $('view-'+view).classList.add('active');
@@ -1225,13 +1219,6 @@ function openQuickMenu(){
   document.querySelectorAll('.qitem[data-target]').forEach(el=>{
     el.classList.toggle('active', el.dataset.target === currentView);
   });
-  const defectItem = document.querySelector('.qitem[data-target="defect"]');
-  if(defectItem){
-    const link = apartmentLinkFor(currentBuilding);
-    defectItem.innerHTML = link
-      ? '<span class="ic">🏢</span>세대별 점검 앱 열기<br><span style="font-size:10px;">(새 탭에서 진행)</span>'
-      : '<span class="ic">🛠</span>불량내역 입력';
-  }
   $('quickOverlay').classList.add('show');
 }
 $('sheetClose').onclick = ()=> $('quickOverlay').classList.remove('show');
@@ -1965,16 +1952,6 @@ const BUILDING_STRUCTURE = {
                              floorsByWing: { '본관동':['1F','2F','3F','4F'], '별관동':['1F','2F','3F','4F'], '강당동':['1F','2F'] } }, // [v42] 마스터DB 실사데이터 기준 - 강당동은 2F까지만 실제 존재
   '_default':      { wings: [], floors: ['B1','1F','2F','3F','4F','5F','6F','7F','8F'] }
 };
-
-// ================= 아파트형 대상물 → 별도 앱으로 연결 =================
-// 세대별 점검(중산현대아파트, 경남팰리스 등)은 이 화면 안의 동/층 드롭박스에 억지로 욱여넣지 않고,
-// 철주님이 이미 쓰고 계신 전용 앱(카카오톡/문자로 공유하시던 그 화면, GitHub Pages APT 폴더)으로
-// "불량내역 입력"을 눌렀을 때 그대로 이동시킨다. 새 아파트를 추가하려면 아래 맵에 한 줄만 추가하면 된다.
-const APARTMENT_LINKS = {
-  '중산현대아파트': 'https://cjyoon99.github.io/APT/'
-  // 예) '경남팰리스': 'https://cjyoon99.github.io/APT/gnpalace.html'
-};
-function apartmentLinkFor(name){ return APARTMENT_LINKS[name] || null; }
 // 대상물별 설비명 - 실제로는 이 대상물 facility_status 사용빈도순 조회. 프로토타입은 목업(사용빈도 순서로 미리 정렬).
 // sub가 있으면 "부속 설비명" 2단 선택 (예: 발신기→경종, 방화셔터→연동제어기)
 // 혁신소방_설비목록_불량내용_편집용_V02(윤철주님 검수/수정본, 2026-07-18) 전체 반영본
@@ -3571,7 +3548,17 @@ $('editDeleteBtn').onclick = async ()=>{
   showToast('휴지통으로 옮겼습니다 (복원 가능)');
 };
 
+// [v54] 세대별 점검 앱(아파트/공동주택 전용, 별도 페이지) — 배포 파일명/경로가 바뀌면 이 한 줄만 고치면 됨.
+const APT_APP_URL = 'https://cjyoon99.github.io/APT/';
+$('aptAppOpenBtn').onclick = ()=>{
+  if(!currentBuilding){ showToast('대상물을 먼저 선택해주세요'); return; }
+  window.open(APT_APP_URL + '?building=' + encodeURIComponent(currentBuilding), '_blank');
+  showToast('세대별 점검 앱을 새 탭에서 열었습니다 — 저장 후 "동기화 후 돌아가기"를 누르면 여기 목록에 자동으로 합쳐집니다');
+};
 $('defectSaveBtn').onclick = async ()=>{
+  // [v54] 아파트처럼 세대 수가 많은 대상물은 "세대별 점검 앱"(별도 페이지, 동/층/세대 단위로
+  // 훨씬 빠르게 입력 가능)에서 저장한 불량내역도 이 화면(defect: 저장소)에 그대로 합쳐지도록
+  // 연동했다 — 아래 aptAppOpenBtn 참고. 이 저장 버튼 자체 로직은 변경 없음.
   const eff = getEffectiveEquip();
   const equip = eff.name ? eff.name + (eff.sub ? ' '+eff.sub : '') : null;
   const defectContent = $('defectContent').value.trim();
