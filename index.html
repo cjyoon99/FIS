@@ -381,12 +381,9 @@ window.onerror = function(msg, url, line, col, err){
   <!-- ================= 불량내역 입력 ================= -->
   <div class="view" id="view-defect">
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
-        <span id="aptAppOpenBtn" style="color:var(--accent);font-weight:700;cursor:pointer;font-size:12px;">🏢 세대별 점검 앱 열기 (아파트) →</span>
-        <span>
-          <span id="defectXlsxImportBtn" style="color:var(--accent);font-weight:700;cursor:pointer;font-size:12px;">📥 엑셀에서 불러오기</span>
-          <input type="file" accept=".xlsx" id="defectXlsxImportInput" style="display:none;">
-        </span>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+        <span id="defectXlsxImportBtn" style="color:var(--accent);font-weight:700;cursor:pointer;font-size:12px;">📥 엑셀에서 불러오기</span>
+        <input type="file" accept=".xlsx" id="defectXlsxImportInput" style="display:none;">
       </div>
       <label style="display:flex;justify-content:space-between;align-items:center;">
         <span>위치 (동 · 층 · 상세위치)</span>
@@ -2268,6 +2265,35 @@ function masterWingsToStructure(wings){
   wingNames.forEach(w=>{ floorsByWing[w] = wings[w] || []; });
   return { wings: wingNames, floors: [...floorSet], floorsByWing };
 }
+// [v54] 이름 표기 불일치 매칭 보강 — 일정/직접입력 등에서 쓰이는 대상물명과 마스터DB(203개)의 키가
+// 공백 표기만 다른 경우(예: 일정의 "여진모건물" vs 마스터DB의 "여진모 건물")가 있어, 완전 일치가
+// 실패하면 공백을 제거한 정규화 이름으로 한 번 더 찾는다. 단, "고 은 빌"처럼 의도적으로 공백이 들어간
+// 이름과 다른 대상물이 정규화 후 충돌할 수 있으므로, 정규화 결과가 정확히 1건으로만 매칭될 때만 채택하고
+// 2건 이상 겹치면 모호하다고 보고 매칭하지 않는다(잘못된 대상물 정보가 섞여 들어가는 것을 방지).
+function normalizeBuildingName(name){
+  return (name || '').replace(/\s+/g, '');
+}
+let _masterNormIndex = null;
+function getMasterNormIndex(){
+  if(_masterNormIndex) return _masterNormIndex;
+  _masterNormIndex = {};
+  if(typeof BUILDINGS_MASTER !== 'undefined' && BUILDINGS_MASTER && BUILDINGS_MASTER.data){
+    Object.keys(BUILDINGS_MASTER.data).forEach(key=>{
+      const norm = normalizeBuildingName(key);
+      if(!_masterNormIndex[norm]) _masterNormIndex[norm] = [];
+      _masterNormIndex[norm].push(key);
+    });
+  }
+  return _masterNormIndex;
+}
+function findMasterEntryByName(name){
+  if(typeof BUILDINGS_MASTER === 'undefined' || !BUILDINGS_MASTER || !BUILDINGS_MASTER.data) return null;
+  if(BUILDINGS_MASTER.data[name]) return BUILDINGS_MASTER.data[name];
+  const norm = normalizeBuildingName(name);
+  const candidates = getMasterNormIndex()[norm];
+  if(candidates && candidates.length === 1) return BUILDINGS_MASTER.data[candidates[0]];
+  return null; // 매칭 없음 또는 2건 이상 충돌 — 안전하게 매칭하지 않고 넘어간다
+}
 // buildings.js 1건을 기준정보(BASIC_FIELD_DEFS 필드) + 시설현황(facility)으로 변환.
 // 이번 달 점검기간·층수·승강기 등 이 DB가 갖고 있지 않은 항목은 비워두어, 현장/사무실에서 보완 입력하게 한다.
 // [v46] 불량이력 조회 — 화정초 등 7개 대상물처럼 손으로 큐레이션한 PAST_DEFECTS가 있으면 그걸 우선 쓰고
@@ -2275,9 +2301,8 @@ function masterWingsToStructure(wings){
 // Sheet5(불량 및 조치사항)에서 자동으로 뽑아준 이력(entry.defects)으로 대체한다. 둘 다 없으면 빈 배열.
 function getPastDefectsFor(name){
   if(PAST_DEFECTS[name]) return PAST_DEFECTS[name];
-  if(typeof BUILDINGS_MASTER !== 'undefined' && BUILDINGS_MASTER && BUILDINGS_MASTER.data && BUILDINGS_MASTER.data[name]){
-    return BUILDINGS_MASTER.data[name].defects || [];
-  }
+  const entry = findMasterEntryByName(name); // [v54] 공백 표기 차이도 매칭
+  if(entry) return entry.defects || [];
   return [];
 }
 function masterEntryToProfileFields(entry){
@@ -2307,7 +2332,8 @@ function ensureMasterDataFor(name){
   // [v41] 대상물 마스터 데이터 파일(<script src>)이 어떤 이유로든 로드되지 않았을 때,
   // 여기서 앱 전체가 멈추지 않고 "DB 연동 없이" 이전처럼 동작하도록 안전하게 빠져나감.
   if(typeof BUILDINGS_MASTER === 'undefined' || !BUILDINGS_MASTER) return false;
-  const entry = BUILDINGS_MASTER.data && BUILDINGS_MASTER.data[name];
+  // [v54] 정확히 일치하는 키가 없으면(예: 일정명 "여진모건물" vs DB키 "여진모 건물") 공백 제거 정규화로 재시도
+  const entry = findMasterEntryByName(name);
   if(!entry) return false;
   if(!BUILDING_PROFILES[name]) BUILDING_PROFILES[name] = masterEntryToProfileFields(entry);
   if(!EQUIP_DB[name]) EQUIP_DB[name] = masterEquipToEquipDB(entry.equip);
@@ -3548,17 +3574,7 @@ $('editDeleteBtn').onclick = async ()=>{
   showToast('휴지통으로 옮겼습니다 (복원 가능)');
 };
 
-// [v54] 세대별 점검 앱(아파트/공동주택 전용, 별도 페이지) — 배포 파일명/경로가 바뀌면 이 한 줄만 고치면 됨.
-const APT_APP_URL = 'https://cjyoon99.github.io/APT/';
-$('aptAppOpenBtn').onclick = ()=>{
-  if(!currentBuilding){ showToast('대상물을 먼저 선택해주세요'); return; }
-  window.open(APT_APP_URL + '?building=' + encodeURIComponent(currentBuilding), '_blank');
-  showToast('세대별 점검 앱을 새 탭에서 열었습니다 — 저장 후 "동기화 후 돌아가기"를 누르면 여기 목록에 자동으로 합쳐집니다');
-};
 $('defectSaveBtn').onclick = async ()=>{
-  // [v54] 아파트처럼 세대 수가 많은 대상물은 "세대별 점검 앱"(별도 페이지, 동/층/세대 단위로
-  // 훨씬 빠르게 입력 가능)에서 저장한 불량내역도 이 화면(defect: 저장소)에 그대로 합쳐지도록
-  // 연동했다 — 아래 aptAppOpenBtn 참고. 이 저장 버튼 자체 로직은 변경 없음.
   const eff = getEffectiveEquip();
   const equip = eff.name ? eff.name + (eff.sub ? ' '+eff.sub : '') : null;
   const defectContent = $('defectContent').value.trim();
@@ -4403,7 +4419,7 @@ function _hasEquipLoose(building, names){
 // "가압송수장치" 항목(주펌프 형태·기동장치 등)이 값과 함께 들어있으므로, 이걸로도 펌프 존재를 판단한다.
 function _hasPumpSpec(building){
   if(typeof BUILDINGS_MASTER === 'undefined' || !BUILDINGS_MASTER || !BUILDINGS_MASTER.data) return false;
-  const entry = BUILDINGS_MASTER.data[building];
+  const entry = findMasterEntryByName(building); // [v54] 공백 표기 차이도 매칭
   if(!entry || !entry.spec) return false;
   const common = entry.spec['수계소화설비(공통)'];
   return !!(common && common['가압송수장치'] && common['가압송수장치'].length);
