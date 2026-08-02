@@ -144,7 +144,8 @@ window.onerror = function(msg, url, line, col, err){
   .ir:nth-child(odd):not(.wide){border-right:1px solid #f0f0f5;}
   .ir.wide{grid-column:1/-1;}
   .il{font-size:11px;color:#aaa;margin-bottom:3px;}
-  .iv{font-size:13px;color:#111;line-height:1.5;word-break:break-all;}
+  .iv{font-size:13px;color:#111;line-height:1.5;word-break:break-all;white-space:pre-line;}
+  .ig-group-hd{grid-column:1/-1;font-size:12px;font-weight:700;color:#1c3d6e;background:#eef2fa;padding:6px 10px;margin-top:4px;border-bottom:1px solid #dde4f0;}
   .map-btns{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
   .map-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;font-family:inherit;-webkit-appearance:none;min-height:32px;}
   .map-btn.kakao{background:#FEE500;color:#3C1E1E;}
@@ -177,7 +178,7 @@ window.onerror = function(msg, url, line, col, err){
   .si:nth-child(odd):not(.wide){border-right:1px solid #f4f5f9;}
   .si.wide{grid-column:1/-1;}
   .si-l{font-size:11px;color:#aaa;margin-bottom:2px;}
-  .si-v{font-size:13px;color:#111;line-height:1.5;word-break:break-all;}
+  .si-v{font-size:13px;color:#111;line-height:1.5;word-break:break-all;white-space:pre-line;}
   .di{background:#fff;border:1px solid #eee;border-radius:10px;padding:12px;margin-bottom:8px;}
   .di-top{display:flex;align-items:center;gap:7px;margin-bottom:6px;flex-wrap:wrap;}
   .dc2{font-size:11px;color:#bbb;background:#f5f5f5;padding:2px 7px;border-radius:10px;}
@@ -289,14 +290,19 @@ window.onerror = function(msg, url, line, col, err){
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
-<!-- [v40] 업체(테넌트)별 대상물 마스터 DB를 코드로 구분해 동적으로 로드.
+<!-- [v63] 업체(테넌트)별 대상물 마스터 DB를 코드로 구분해 동적으로 로드.
      URL에 ?tenant=업체코드 를 붙이면 그 업체 데이터를, 없으면 기본값(혁신소방)을 불러온다.
      새 업체가 생기면: (1) 그 업체 데이터 파일을 평소 버전규칙대로 만들어 올리고
      (2) 아래 TENANT_FILES에 코드 한 줄만 추가하면 된다. 앱 코드(이 html)는 손댈 필요 없음.
-     10개 코드는 미리 뽑아둔 것 — 혁신소방이 1번(7N040I), 나머지 9개는 다음 고객사용으로 비축. -->
+     10개 코드는 미리 뽑아둔 것 — 혁신소방이 1번(7N040I), 나머지 9개는 다음 고객사용으로 비축.
+     [v63] file 값은 이제 버전이 찍힌 정확한 파일명이 아니라, buildings생성기(V12+)가
+     새 버전을 만들 때마다 자동으로 같이 갱신해주는 "안내판" 파일(...latest.js)을 가리킨다.
+     이 안내판 파일 내용은 그 시점의 최신 버전 파일을 document.write로 불러오는 한 줄뿐이라,
+     새 버전이 나올 때마다 여기(TENANT_FILES)는 다시는 손댈 필요가 없다. 로컬 폴더로 쓰든
+     나중에 깃허브로 옮기든(상대경로 파일 하나 더 부르는 것뿐이라) 동일하게 동작한다. -->
 <script>
   var TENANT_FILES = {
-    '7N040I': { name:'혁신소방',   file:'참소방_대상물마스터_혁신소방_V03_20260725_1630.js' },
+    '7N040I': { name:'혁신소방',   file:'참소방_대상물마스터_혁신소방_latest.js' },
     'ANW4L1': { name:'(미배정)',   file:null },
     'WWLQVE': { name:'(미배정)',   file:null },
     '3HGB9N': { name:'(미배정)',   file:null },
@@ -1238,9 +1244,9 @@ const FAC_TREE=[
   ]},
   {big:'경보설비',icon:'🔔',mids:[{mid:'',items:['단독경보형감지기','비상경보설비','자동화재탐지설비','시각경보기','비상방송설비','통합감시시설','자동화재속보설비','누전경보기','가스누설경보기']}]},
   {big:'피난구조설비',icon:'🚪',mids:[
-    {mid:'피난기구',items:['공기안전매트','피난사다리','(간이)완강기','미끄럼대','구조대','다수인피난장비','승강식피난기·하향식피난구용내림식사다리']},
-    {mid:'인명구조기구',items:['인명구조기구']},
-    {mid:'유도등 및 유도표지',items:['피난구유도등','통로유도등','객석유도등','유도표지','피난유도선']},
+    {mid:'피난기구',items:['공기안전매트','피난사다리','완강기','간이완강기','미끄럼대','구조대','다수인피난장비','승강식피난기·하향식피난구용내림식사다리','피난교','피난용트랩']},
+    {mid:'인명구조기구',items:['인명구조기구','방열복/방화복','공기호흡기','인공소생기']},
+    {mid:'유도등 및 유도표지',items:['유도등','피난구유도등','통로유도등','객석유도등','유도표지','피난유도선']},
     {mid:'비상조명',items:['비상조명등','휴대용비상조명등']},
   ]},
   {big:'소화용수설비',icon:'💧',mids:[{mid:'',items:['상수도소화용수설비','소화수조','저수조']}]},
@@ -1249,103 +1255,14 @@ const FAC_TREE=[
     {mid:'연결설비',items:['연결송수관설비','연결살수설비']},
     {mid:'기타 활동설비',items:['비상콘센트설비','무선통신보조설비','연소방지설비']},
   ]},
-  {big:'기타',icon:'🏗️',mids:[{mid:'',items:['방화문','방화셔터','비상구','방염']}]},
+  {big:'기타',icon:'🏗️',mids:[{mid:'',items:['방화문','방화셔터','비상구','피난통로','방염']}]},
 ];
 const MULTI_ITEMS=['소화기또는자동확산소화기','간이스프링클러설비','비상경보설비또는자동화재탐지설비','가스누설경보기','피난기구','피난유도선','유도등·유도표지또는비상조명등','휴대용비상조명','방화문','비상구(비상탈출구)','영업장내부피난통로','영상음향차단장치','누전차단기','창문','피난안내도·피난안내영상물','방염물품'];
 
-const BUILDING_PROFILES = {
-  '골드프라자': {
-    year:'26년', type:'작동', div:'일반',
-    pm:'12월', tym:'12월', twm:'6월',
-    floor_area:'1,829.05㎡', build_area:'443.60㎡', floors:'지상 9층',
-    height:'35.2m', buildings:'1개동', structure:'철근콘크리트구조',
-    staircase:'1개소', elevator:'승용 1대', parking:'필로티, 기계식',
-    insurance:'가입', period:'매년 1회', address:'울산 남구 삼산로 175',
-    usage:'근린생활시설', multi_use:'해당없음', fire_plan:'작성',
-    facility: {'옥내소화전설비':true,'소화기구 및 자동소화장치':true,'자동화재탐지설비 및 시각경보기':true,'유도등':true},
-    multi_facility: {},
-    extinguisher: {'분말소화기(개)':'11','이산화탄소소화기(개)':'2','자동확산소화기(개)':'4'},
-    spec: {'수계소화설비(공통)':{'':[{lb:'설치장소',vl:'계단실 부속실'},{lb:'설치개수',vl:'9개'}]},'가압송수장치':{'':[{lb:'방식',vl:'고가수조방식'},{lb:'주펌프/토출량',vl:'400 ℓ/min'}]}}
-  },
-  '화정초등학교': {
-    year:'26년', type:'작동', div:'공공기관',
-    pm:'01월', tym:'', twm:'01월',
-    floor_area:'8,444.34 ㎡ (본관 5041.97 ㎡ + 별관 2586.6 ㎡ + 체육관동 815.77 ㎡)', build_area:'2,909.50 ㎡ (본관 1522.43 ㎡ + 658.8 ㎡ + 체육관동 728.27 ㎡)', floors:'지상 4층 지상 2층',
-    height:'기재없음', buildings:'3개동', structure:'건축물 철근콘크리트구조',
-    staircase:'3개소 1개소 2개소', elevator:'승용 1대', parking:'지상, 필로티, 옥외',
-    insurance:'가입 (교육시설재난공제회)', period:'2026 년 01 월 07 일 ~ 2026 년 01 월 07 일 ( 총 점검일수: 1 일 )', address:'울산광역시 동구 대송9길 55 (화정동)',
-    usage:'교육연구시설', multi_use:'해당없음', fire_plan:'작성',
-    facility: {'분말소화기':true,'자동확산소화기':true,'K급소화기':true,'옥내소화전설비':true,'이산화탄소소화설비':true,'비상경보설비':true,'자동화재탐지설비':true,'시각경보기':true,'비상방송설비':true,'가스누설경보기':true,'공기안전매트':true,'피난사다리':true,'(간이)완강기':true,'미끄럼대':true,'구조대':true,'피난구유도등':true,'통로유도등':true,'유도표지':true,'방화문':true,'방화셔터':true,'비상구':true},
-    multi_facility: {},
-    extinguisher: {'분말소화기(개)':'128','자동확산소화기(개)':'6','K급소화기(개)':'1'},
-    spec: {'수계소화설비(공통)':{'수원':[{lb:'겸용설비의 종류',vl:'옥내소화전설비'},{lb:'설치장소',vl:'펌프실, 지상1층, 펌프실'},{lb:'보조수원',vl:'본관동 및 별관동 옥상'},{lb:'주된수원/유효수량/(㎥)',vl:'7.8'},{lb:'흡입방식',vl:'부압'}],'가압송수장치':[{lb:'방식',vl:'펌프방식'},{lb:'설치장소',vl:'펌프실 지상1층 펌프실'},{lb:'주펌프 형태',vl:'전동기'},{lb:'기동장치',vl:'기동용수압개폐장치'},{lb:'기동장치/방식',vl:'압력챔버'},{lb:'기동장치사양/용량/압력',vl:'100ℓ / 1.0MPa'},{lb:'주펌프/전양정/(m)',vl:'55'},{lb:'주펌프/토출량/(ℓ/min)',vl:'400'},{lb:'충압펌프/전양정/(m)',vl:'50'},{lb:'충압펌프/토출량/(ℓ/min)',vl:'60'},{lb:'물올림장치',vl:'유효수량 100ℓ'}],'송수구':[{lb:'용도',vl:'옥내소화전설비'},{lb:'설치장소',vl:'본관동 펌프실 벽면, 쌍구형 1개'}]},'수계소화설비(개별)':{'옥내소화전':[{lb:'설치장소',vl:'별관동, 전체층'},{lb:'설치개수',vl:'최대 3개'}]},'가스계소화설비':{'가스계소화설비':[{lb:'분류',vl:'이산화탄소'},{lb:'방식',vl:'호스릴, 고압식, 축압식'},{lb:'설치장소',vl:'강당동 일부층 지상1층'},{lb:'저장용기',vl:'45kg, 68ℓ'},{lb:'수량',vl:'6개'},{lb:'소화약제',vl:'이산화탄소'}]},'경보설비':{'비상경보설비':[{lb:'유형',vl:'비상벨설비'},{lb:'설치장소',vl:'강당동'}],'자동화재탐지설비':[{lb:'수신기위치',vl:'본관동 숙직실 지상1층 숙직실'},{lb:'경보방식',vl:'전층경보'},{lb:'시각경보기',vl:'유'},{lb:'감지기종류',vl:'열, 연기'}],'비상방송설비':[{lb:'전용/겸용',vl:'겸용'},{lb:'경보방식',vl:'전층경보'},{lb:'증폭기설치장소',vl:'본관동 지상1층 방송실'}],'가스누설경보기':[{lb:'형태',vl:'분리형'},{lb:'사용가스종류',vl:'LNG'},{lb:'수신기설치장소',vl:'본관, 지상1층, 조리장'},{lb:'차단기구유무',vl:'유, 경계구역 수(2개)'}]},'피난구조설비':{'유도등':[{lb:'종류',vl:'피난구, 통로, 유도표지'},{lb:'설치장소',vl:'별관동, 본관/별관/체육관동, 본관/별관'}]}}
-  },
-  '꽃바위유치원': {
-    year:'25년', type:'작동', div:'공공기관',
-    pm:'07월', tym:'', twm:'07월',
-    floor_area:'1,999.54 ㎡', build_area:'812.16 ㎡', floors:'지상 1층 / 지하 3 층 지상1층',
-    height:'14.5m', buildings:'1개동', structure:'건축물 철근콘크리트구조',
-    staircase:'3개소', elevator:'승용 1대', parking:'지하, 지상, 옥외',
-    insurance:'가입 (한국교육시설안전원)', period:'2025 년 07 월 14 일 ~ 2025 년 07 월 14 일 ( 총 점검일수: 1 일 )', address:'울산광역시 동구 문현2길 41 (방어동)',
-    usage:'노유자시설', multi_use:'해당없음', fire_plan:'작성',
-    facility: {'분말소화기':true,'자동확산소화기':true,'K급소화기':true,'옥내소화전설비':true,'스프링클러설비':true,'자동화재탐지설비':true,'시각경보기':true,'가스누설경보기':true,'구조대':true,'피난구유도등':true,'통로유도등':true,'비상조명등':true,'휴대용비상조명등':true,'방화문':true,'방화셔터':true,'비상구':true,'방염':true},
-    multi_facility: {},
-    extinguisher: {'분말소화기(개)':'25','자동확산소화기(개)':'22','K급소화기(개)':'1'},
-    spec: {'수계소화설비(공통)':{'수원':[{lb:'겸용설비의 종류',vl:'옥내소화전설비'},{lb:'설치장소',vl:'지하1층, 소화수조실'},{lb:'보조수원',vl:'예비펌프 설치'},{lb:'주된수원/유효수량/(㎥)',vl:'21.2'},{lb:'흡입방식',vl:'정압'}],'가압송수장치':[{lb:'방식',vl:'펌프방식'},{lb:'설치장소',vl:'지하1층 기계실'},{lb:'주펌프 형태',vl:'내연기관'},{lb:'예비펌프 형태',vl:'내연기관'},{lb:'기동장치',vl:'기동용수압개폐장치'},{lb:'기동장치/방식',vl:'기동용수압개폐장치'},{lb:'주펌프/전양정/(m)',vl:'80'},{lb:'주펌프/토출량/(ℓ/min)',vl:'1,200'},{lb:'충압펌프/전양정/(m)',vl:'80'},{lb:'충압펌프/토출량/(ℓ/min)',vl:'60'},{lb:'예비펌프/전양정/(m)',vl:'80'},{lb:'예비펌프/토출량/(ℓ/min)',vl:'1,200'}],'송수구':[{lb:'용도',vl:'옥내소화전설비, 스프링클러설비'},{lb:'설치장소',vl:'건물 북쪽, 쌍구형 1개'}],'비상전원':[{lb:'비상전원',vl:'축전지설비'}]},'수계소화설비(개별)':{'옥내소화전':[{lb:'설치장소',vl:'전체층'},{lb:'설치개수',vl:'최대 2개'}],'스프링클러설비':[{lb:'종류',vl:'습식'},{lb:'설치장소',vl:'습식: 전체층 전체층'}]},'경보설비':{'자동화재탐지설비':[{lb:'수신기위치',vl:'지상1층 당직실'},{lb:'경보방식',vl:'전층경보'},{lb:'시각경보기',vl:'유'},{lb:'감지기종류',vl:'열, 연기'}],'가스누설경보기':[{lb:'형태',vl:'분리형'},{lb:'사용가스종류',vl:'LNG'},{lb:'수신기설치장소',vl:'지하1층, 지상1층, 실명(지상1층 주방/지하1층 보일러실'},{lb:'차단기구유무',vl:'유, 경계구역 수(2개)'}]},'피난구조설비':{'피난기구':[{lb:'종류',vl:'구조대'},{lb:'설치장소',vl:'일부층 지상3층'}],'유도등':[{lb:'종류',vl:'피난구, 통로'},{lb:'설치장소',vl:'숙직실'}],'휴대용비상조명등':[{lb:'설치장소',vl:'전체층'},{lb:'전원',vl:'건전지식'}]}}
-  },
-  '내황초등학교': {
-    year:'26년', type:'종합', div:'공공기관',
-    pm:'01월', tym:'01월', twm:'',
-    floor_area:'7,060.11 ㎡ (본관 4385.37 ㎡ + 별관 1492.74 ㎡ + 강당 1182 ㎡)', build_area:'2,355.12 ㎡ (본관 1229.1 ㎡ + 532.22 ㎡ + 강당 593.8 ㎡)', floors:'본관 지상 4층 별관 지상 3층 강당 지상 2층',
-    height:'본관 13.65m 강당 17.626m', buildings:'3개동', structure:'기재없음',
-    staircase:'본관 3개소 강당 1개소', elevator:'승용 1대', parking:'옥외',
-    insurance:'가입 (한국교육시설안전원)', period:'2026 년 01 월 26 일 ~ 2026 년 01 월 26 일 ( 총 점검일수: 1 일 )', address:'울산광역시 중구 내황13길 53(반구동)',
-    usage:'교육연구시설', multi_use:'해당없음', fire_plan:'작성',
-    facility: {'분말소화기':true,'CO2/하론소화기(청정)':true,'자동확산소화기':true,'K급소화기':true,'옥내소화전설비':true,'자동화재탐지설비':true,'시각경보기':true,'비상방송설비':true,'가스누설경보기':true,'피난구유도등':true,'통로유도등':true,'유도표지':true,'방화문':true,'방화셔터':true,'비상구':true},
-    multi_facility: {},
-    extinguisher: {'분말소화기(개)':'111','CO2/하론소화기(청정)':'1','자동확산소화기(개)':'1','K급소화기(개)':'3'},
-    spec: {'수계소화설비(공통)':{'수원':[{lb:'겸용설비의 종류',vl:'옥내소화전설비'},{lb:'설치장소',vl:'본관, 지상1층, 기계실'},{lb:'보조수원',vl:'본관 옥상 옥외'},{lb:'보조수원 용량',vl:'2.6㎥'},{lb:'주된수원/유효수량/(㎥)',vl:'7.8'},{lb:'흡입방식',vl:'부압'}],'가압송수장치':[{lb:'방식',vl:'펌프방식'},{lb:'설치장소',vl:'본관 지상1층 기계실'},{lb:'주펌프 형태',vl:'전동기'},{lb:'기동장치',vl:'기동용수압개폐장치'},{lb:'기동장치/방식',vl:'압력챔버'},{lb:'기동장치사양/용량/압력',vl:'100ℓ / 1.0MPa'},{lb:'주펌프/전양정/(m)',vl:'55'},{lb:'주펌프/토출량/(ℓ/min)',vl:'600'},{lb:'충압펌프/전양정/(m)',vl:'55'},{lb:'충압펌프/토출량/(ℓ/min)',vl:'60'},{lb:'물올림장치',vl:'유효수량 100ℓ'}],'송수구':[{lb:'용도',vl:'옥내소화전설비'},{lb:'설치장소',vl:'도로변 육교 옆, 쌍구형 1개'}]},'수계소화설비(개별)':{'옥내소화전':[{lb:'설치장소',vl:'본관, 전체층'},{lb:'설치개수',vl:'최대 3개'}]},'경보설비':{'자동화재탐지설비':[{lb:'수신기위치',vl:'본관 지상1층 숙직실'},{lb:'경보방식',vl:'전층경보'},{lb:'시각경보기',vl:'유'},{lb:'감지기종류',vl:'열, 연기'}],'비상방송설비':[{lb:'전용/겸용',vl:'겸용'},{lb:'경보방식',vl:'전층경보'},{lb:'증폭기설치장소',vl:'본관 지상1층 방송실'}],'가스누설경보기':[{lb:'형태',vl:'분리형'},{lb:'사용가스종류',vl:'LNG'},{lb:'수신기설치장소',vl:'강당, 지상1층, 영양사실'},{lb:'차단기구유무',vl:'유, 경계구역 수(2개)'}]},'피난구조설비':{'유도등':[{lb:'종류',vl:'피난구, 통로, 유도표지'},{lb:'설치장소',vl:'본관, 별관, 강당'}]}}
-  },
-  '고헌중학교': {
-    year:'26년', type:'종합', div:'공공기관',
-    pm:'01월', tym:'01월', twm:'',
-    floor_area:'13,928.17 ㎡', build_area:'4,852.30 ㎡', floors:'지상 4층 / 지하 1층',
-    height:'18.82m', buildings:'1개동', structure:'건축물 철골구조',
-    staircase:'6개소', elevator:'승용 4대', parking:'필로티, 옥외',
-    insurance:'가입 (한국교육시설안전원)', period:'2026 년 01 월 13 일 ~ 2026 년 01 월 14 일 ( 총 점검일수 : 2 일 )', address:'울산광역시 북구 박상진2로 81 (화봉동)',
-    usage:'교육연구시설', multi_use:'해당없음', fire_plan:'작성',
-    facility: {'분말소화기':true,'자동확산소화기':true,'K급소화기':true,'옥내소화전설비':true,'스프링클러설비':true,'이산화탄소소화설비':true,'자동화재탐지설비':true,'시각경보기':true,'비상방송설비':true,'가스누설경보기':true,'(간이)완강기':true,'피난구유도등':true,'통로유도등':true,'비상조명등':true,'상수도소화용수설비':true,'방화문':true,'방화셔터':true,'비상구':true},
-    multi_facility: {},
-    extinguisher: {'분말소화기(개)':'117','자동확산소화기(개)':'3','K급소화기(개)':'3'},
-    spec: {'수계소화설비(공통)':{'수원':[{lb:'겸용설비의 종류',vl:'옥내소화전설비, 스프링클러설비'},{lb:'설치장소',vl:'지하1층, 기계실'},{lb:'보조수원',vl:'예비펌프 설치'},{lb:'주된수원/유효수량/(㎥)',vl:'29.48'},{lb:'흡입방식',vl:'정압'}],'가압송수장치':[{lb:'방식',vl:'펌프방식'},{lb:'설치장소',vl:'지하1층 기계실 / 지하1층 발전기실'},{lb:'주펌프 형태',vl:'전동기'},{lb:'예비펌프 형태',vl:'전동기'},{lb:'기동장치',vl:'기동용수압개폐장치'},{lb:'기동장치/방식',vl:'압력챔버'},{lb:'기동장치사양/용량/압력',vl:'100ℓ / 1MPa'},{lb:'주펌프/전양정/(m)',vl:'60'},{lb:'주펌프/토출량/(ℓ/min)',vl:'1,450'},{lb:'충압펌프/전양정/(m)',vl:'65'},{lb:'충압펌프/토출량/(ℓ/min)',vl:'60'},{lb:'예비펌프/전양정/(m)',vl:'60'},{lb:'예비펌프/토출량/(ℓ/min)',vl:'1,450'}],'송수구':[{lb:'용도',vl:'옥내소화전설비, 스프링클러설비'},{lb:'설치장소',vl:'본관 출입구 옆 화단, 쌍구형 2개'}],'비상전원':[{lb:'비상전원',vl:'자가발전설비'}]},'수계소화설비(개별)':{'옥내소화전':[{lb:'설치장소',vl:'전체층'},{lb:'설치개수',vl:'최대 7개'}],'스프링클러설비':[{lb:'종류',vl:'습식'},{lb:'설치장소',vl:'습식: 일부층 지상4층'}]},'가스계소화설비':{'가스계소화설비':[{lb:'분류',vl:'이산화탄소'},{lb:'방식',vl:'호스릴, 고압식, 축압식'},{lb:'설치장소',vl:'일부층 주차장'},{lb:'저장용기',vl:'45kg, 68ℓ'},{lb:'수량',vl:'14개'},{lb:'소화약제',vl:'이산화탄소'}]},'경보설비':{'자동화재탐지설비':[{lb:'수신기위치',vl:'지상1층 숙직실'},{lb:'경보방식',vl:'전층경보'},{lb:'시각경보기',vl:'유'},{lb:'감지기종류',vl:'열, 연기, 불꽃'}],'비상방송설비':[{lb:'전용/겸용',vl:'겸용'},{lb:'경보방식',vl:'전층경보'},{lb:'증폭기설치장소',vl:'지상1층 방송실'}],'가스누설경보기':[{lb:'형태',vl:'분리형'},{lb:'사용가스종류',vl:'LNG'},{lb:'수신기설치장소',vl:'지상2층, 조리장'},{lb:'차단기구유무',vl:'유, 경계구역 수(2개)'}]},'피난구조설비':{'피난기구':[{lb:'종류',vl:'완강기'},{lb:'설치장소',vl:'일부층 지상3층~지상4층'}],'유도등':[{lb:'종류',vl:'피난구, 통로'}]},'소화용수설비':{'상수도소화용수':[{lb:'설치장소',vl:'교문 주차장 출입구앞'},{lb:'호칭지름(mm)',vl:'100㎜'}]}}
-  },
-  '중앙중학교': {
-    year:'26년', type:'종합', div:'공공기관',
-    pm:'01월', tym:'01월', twm:'',
-    floor_area:'9,715.94 ㎡ (본관 5953.62 ㎡ + 별관 2445.72 ㎡ + 강당 1316.6 ㎡)', build_area:'3,703.29 ㎡ (본관 1543.08 ㎡ + 836.61 ㎡ + 강당 1323.6 ㎡)', floors:'본관 지상 4층 별관 지상 4층 강당 지상 2층',
-    height:'본관 15.95m 별관 15m 강당 13.5m', buildings:'3개동', structure:'기재없음',
-    staircase:'본관 3개소 별관 2개소', elevator:'승용 1대', parking:'옥외',
-    insurance:'가입 (한국교육시설안전원)', period:'2026 년 01 월 28 일 ~ 2026 년 01 월 28 일 ( 총 점검일수: 1 일 )', address:'울산광역시 남구 중앙로63번길 5',
-    usage:'교육연구시설', multi_use:'해당없음', fire_plan:'작성',
-    facility: {'분말소화기':true,'CO2/하론소화기(청정)':true,'자동확산소화기':true,'옥내소화전설비':true,'상업용주방자동소화장치':true,'자동화재탐지설비':true,'시각경보기':true,'비상방송설비':true,'가스누설경보기':true,'(간이)완강기':true,'피난구유도등':true,'통로유도등':true,'유도표지':true,'상수도소화용수설비':true,'방화문':true,'방화셔터':true,'비상구':true},
-    multi_facility: {},
-    extinguisher: {'분말소화기(개)':'103','CO2/하론소화기(청정)':'2','자동확산소화기(개)':'6'},
-    spec: {'수계소화설비(공통)':{'수원':[{lb:'겸용설비의 종류',vl:'옥내소화전설비'},{lb:'보조수원',vl:'본관 옥상'},{lb:'보조수원 용량',vl:'2.6㎥'},{lb:'주된수원/유효수량/(㎥)',vl:'7.8'},{lb:'흡입방식',vl:'부압'}],'가압송수장치':[{lb:'방식',vl:'펌프방식'},{lb:'설치장소',vl:'본관동 지상1층 소방펌프실'},{lb:'주펌프 형태',vl:'전동기'},{lb:'기동장치',vl:'기동용수압개폐장치'},{lb:'기동장치/방식',vl:'압력챔버'},{lb:'기동장치사양/용량/압력',vl:'100ℓ / 1.0MPa'},{lb:'주펌프/전양정/(m)',vl:'50'},{lb:'주펌프/토출량/(ℓ/min)',vl:'650'},{lb:'충압펌프/전양정/(m)',vl:'50'},{lb:'충압펌프/토출량/(ℓ/min)',vl:'65'},{lb:'물올림장치',vl:'유효수량 200ℓ'}],'송수구':[{lb:'용도',vl:'옥내소화전설비'},{lb:'설치장소',vl:'본관 출입구 옆, 쌍구형 1개'}]},'수계소화설비(개별)':{'옥내소화전':[{lb:'설치장소',vl:'본관, 전체층'},{lb:'설치개수',vl:'최대 3개'}]},'경보설비':{'자동화재탐지설비':[{lb:'수신기위치',vl:'본관 지상1층 숙직실'},{lb:'경보방식',vl:'전층경보'},{lb:'시각경보기',vl:'유'},{lb:'감지기종류',vl:'열, 연기'}],'비상방송설비':[{lb:'전용/겸용',vl:'겸용'},{lb:'경보방식',vl:'전층경보'},{lb:'증폭기설치장소',vl:'본관 지상2층 방송실'}],'가스누설경보기':[{lb:'형태',vl:'분리형'},{lb:'사용가스종류',vl:'LNG'},{lb:'수신기설치장소',vl:'별관, 지상1층, 조리장'},{lb:'차단기구유무',vl:'유, 경계구역 수(2개)'}]},'피난구조설비':{'피난기구':[{lb:'종류',vl:'완강기'},{lb:'설치장소',vl:'별관 일부층 지상3층~지상4층'}],'유도등':[{lb:'종류',vl:'피난구, 통로, 유도표지'},{lb:'설치장소',vl:'별관, 본관, 강당, 별관'}]},'소화용수설비':{'상수도소화용수':[{lb:'설치장소',vl:'본관뒤편후문'},{lb:'호칭지름(mm)',vl:'100㎜'}]}}
-  },
-  '복산나이스': {
-    year:'26년', type:'종합', div:'일반',
-    pm:'01월', tym:'01월', twm:'',
-    floor_area:'3,469.55 ㎡', build_area:'1,012.65 ㎡', floors:'지상 4 층',
-    height:'20.1m', buildings:'1개동', structure:'기재없음',
-    staircase:'2개소', elevator:'승용 1대', parking:'지상, 필로티',
-    insurance:'가입 (KB손해보험)', period:'2026 년 01 월 26 일 ~ 2026 년 01 월 26 일 ( 총 점검일수: 1 일 )', address:'울산광역시 북구 진장유통1로 11 (진장동)',
-    usage:'일반창고(물류창고)', multi_use:'해당없음', fire_plan:'작성',
-    facility: {'분말소화기':true,'자동확산소화기':true,'K급소화기':true,'옥내소화전설비':true,'스프링클러설비':true,'자동화재탐지설비':true,'시각경보기':true,'가스누설경보기':true,'(간이)완강기':true,'피난구유도등':true,'통로유도등':true,'비상조명등':true,'방화문':true,'방화셔터':true,'비상구':true},
-    multi_facility: {},
-    extinguisher: {'분말소화기(개)':'23','자동확산소화기(개)':'1','K급소화기(개)':'1'},
-    spec: {'수계소화설비(공통)':{'수원':[{lb:'겸용설비의 종류',vl:'옥내소화전설비, 스프링클러설비'},{lb:'주된수원/유효수량/(㎥)',vl:'56.25'},{lb:'흡입방식',vl:'정압'}],'가압송수장치':[{lb:'방식',vl:'펌프방식'},{lb:'설치장소',vl:'복산나이스 지상PH층 펌프실'},{lb:'주펌프 형태',vl:'전동기'},{lb:'예비펌프 형태',vl:'내연기관'},{lb:'기동장치',vl:'기동용수압개폐장치'},{lb:'기동장치/방식',vl:'압력챔버'},{lb:'기동장치사양/용량/압력',vl:'100ℓ / 1MPa'},{lb:'주펌프/전양정/(m)',vl:'60'},{lb:'주펌프/토출량/(ℓ/min)',vl:'300'},{lb:'충압펌프/전양정/(m)',vl:'60'},{lb:'충압펌프/토출량/(ℓ/min)',vl:'60'},{lb:'예비펌프/전양정/(m)',vl:'60'},{lb:'예비펌프/토출량/(ℓ/min)',vl:'300'}],'송수구':[{lb:'용도',vl:'옥내소화전설비, 스프링클러설비'}]},'수계소화설비(개별)':{'옥내소화전':[{lb:'설치장소',vl:'복산나이스, 전체층'},{lb:'설치개수',vl:'최대 2개'}],'스프링클러설비':[{lb:'종류',vl:'습식, 준비작동식'},{lb:'설치장소',vl:'습식: 복산나이스 일부층 지상2층~지상4층 준비작동식: 복산나이스 일부층 지상1층'}]},'경보설비':{'자동화재탐지설비':[{lb:'수신기위치',vl:'복산나이스 지상1층 1층 수신반'},{lb:'경보방식',vl:'전층경보'},{lb:'시각경보기',vl:'유'},{lb:'감지기종류',vl:'열, 연기'}],'가스누설경보기':[{lb:'형태',vl:'분리형'},{lb:'사용가스종류',vl:'LPG'},{lb:'수신기설치장소',vl:'실명( 조리장 )'},{lb:'차단기구유무',vl:'유, 경계구역 수(1개)'}]},'피난구조설비':{'피난기구':[{lb:'종류',vl:'완강기'},{lb:'설치장소',vl:'복산나이스 일부층 지상3층~지상4층'}],'유도등':[{lb:'종류',vl:'피난구, 통로'},{lb:'설치장소',vl:'복산나이스, 복산나이스, 복산나이스'}]}}
-  }
-};
+// [v60] 하드코딩된 7개 대상물(골드프라자·화정초등학교·꽃바위유치원·내황초등학교·고헌중학교·중앙중학교·복산나이스)의
+// 손큐레이션 데이터는 마스터DB(V08~)가 더 완전해져서 더 이상 불필요 — 삭제함. 이제 전 대상물이
+// ensureMasterDataFor()를 통해 BUILDINGS_MASTER에서 균일하게 채워진다.
+const BUILDING_PROFILES = {};
 
 // 과거 불량 이력(실시결과점검표분석_20260624 5.불량 및 조치사항 시트, 전 연도) — 대상물당 최신 회차만 반영했던 BUILDING_PROFILES와 별개로
 // 여러 해에 걸친 이력을 그대로 보존. '없음/해당없음/이상없음'은 혁신소방_점검대장_지침_v5 저장 규칙대로 제외, 연도 내림차순 정렬.
@@ -1360,18 +1277,23 @@ const PAST_DEFECTS = {
 };
 
 function tBasic(r){
-  const rows=[
-    ['점검연도',r.year,false],['점검종류',r.type,false],['구분',r.div,false],
-    ['점검월',r.pm,false],
-    ['종합점검월',r.tym,false],['작동점검월',r.twm,false],
-    ['연면적',r.floor_area,false],['건축면적',r.build_area,false],
-    ['층수',r.floors,false],['높이',r.height,false],
-    ['건물동수',r.buildings,false],['건축구조',r.structure,true],
-    ['직통계단',r.staircase,false],['승강기',r.elevator,false],
-    ['주차장',r.parking,true],['화재보험',r.insurance,true],
-    ['점검기간',r.period,true],['소재지',r.address,true],
-    ['대상물용도',r.usage,true],['다중이용업소',r.multi_use,false],
-    ['소방계획서',r.fire_plan,false]
+  const sections=[
+    {items:[['대상물용도',r.usage,false],['소재지',r.address,true],
+             ['점검기간',r.period,true],['총점검일수',r.pm,false]]},
+    {group:'전자우편 및 관할서', items:[
+      ['전자우편 송달 동의 여부',r.email_consent,false],['전자우편주소',r.email,true],['관할소방서명',r.jurisdiction,false]]},
+    {group:'소방안전관리', items:[['소방안전관리등급',r.mgr_grade,false],['최근교육이수일',r.last_edu_date,false]]},
+    {group:'소방관리', items:[['소방계획서 작성여부',r.fire_written,false],['보관여부',r.fire_kept,false],
+     ['작동기능점검 여부',r.self_check_work,false],['종합점검 여부',r.self_check_full,false],
+     ['소방안전교육',r.edu_safety,false],['소방훈련',r.edu_drill,false]]},
+    {group:'화재보험', items:[['가입여부',r.ins_join,false],['보험사',r.ins_company,false],['가입기간',r.ins_period,true]]},
+    {items:[['다중이용업소 갯수',r.multi_use_count,false]]},
+    {group:'건축정보', items:[
+      ['건축허가일',r.build_permit_date,false],['사용승인일',r.use_approval_date,false],
+      ['연면적',r.floor_area,false],['건축면적',r.build_area,false],['세대수',r.households,false],
+      ['층수',r.floors,false],['높이',r.height,false],['건물동수',r.buildings,false],
+      ['건축구조',r.structure,true],['지붕구조',r.roof,false],['경사로',r.ramp,false],
+      ['계단종류',r.stair_type,false],['계단수',r.stair_count,false]]},
   ];
   function rowHTML(l,v,w){
     if(l==='소재지'&&v){
@@ -1383,13 +1305,23 @@ function tBasic(r){
     }
     return`<div class="ir${w?' wide':''}"><div class="il">${l}</div><div class="iv">${v}</div></div>`;
   }
-  return`<div class="ig">${rows.filter(([,v])=>v).map(([l,v,w])=>rowHTML(l,v,w)).join('')}</div>`;
+  const title = r.name ? `<div class="ir wide"><div class="il">대상물명칭</div><div class="iv">${r.name}</div></div>` : '';
+  let body='';
+  sections.forEach(sec=>{
+    const rowsHtml = sec.items.filter(([,v])=>v).map(([l,v,w])=>rowHTML(l,v,w)).join('');
+    if(!rowsHtml) return; // [v61] 그룹 안에 실제로 보여줄 값이 하나도 없으면 그룹 헤더 자체를 안 띄운다(빈 헤더 방지)
+    if(sec.group) body += `<div class="ig-group-hd">${sec.group}</div>`;
+    body += rowsHtml;
+  });
+  return`<div class="ig">${title}${body}</div>`;
 }
 function tFac(r){
   const fac=r.facility||{};
   const mfac=r.multi_facility||{};
   let html='';
+  const covered = new Set();
   for(const {big,icon,mids} of FAC_TREE){
+    mids.forEach(({items})=>items.forEach(k=>covered.add(k)));
     if(!mids.some(({items})=>items.some(k=>fac[k])))continue;
     html+=`<div class="fac-big"><div class="fac-big-hd"><span class="fac-big-icon">${icon}</span><span class="fac-big-name">${big}</span></div><div class="fac-big-body">`;
     for(const {mid,items} of mids){
@@ -1401,21 +1333,53 @@ function tFac(r){
     html+=`</div></div>`;
   }
   const mvis=MULTI_ITEMS.filter(k=>mfac[k]);
+  MULTI_ITEMS.forEach(k=>covered.add(k));
   if(mvis.length){
     html+=`<div class="fac-big"><div class="fac-big-hd"><span class="fac-big-icon">🏪</span><span class="fac-big-name">다중이용업소</span></div><div class="fac-big-body"><div class="fac-mid"><div class="fac-items">`;
     mvis.forEach(k=>{html+=`<div class="fi"><span class="fn">${k}</span><span class="fok">○</span></div>`;});
     html+=`</div></div></div></div>`;
   }
+  // [v61] 소방시설 유무현황(Sheet2)엔 있지만 FAC_TREE/MULTI_ITEMS 분류표에 아직 없는 설비명도
+  // 빠짐없이 보여준다(예: 마스터DB가 새 대분류·세분화된 컬럼명으로 뽑아온 경우).
+  const uncovered = Object.keys(fac).filter(k=>fac[k] && !covered.has(k));
+  if(uncovered.length){
+    html+=`<div class="fac-big"><div class="fac-big-hd"><span class="fac-big-icon">🧩</span><span class="fac-big-name">기타 보유 설비</span></div><div class="fac-big-body"><div class="fac-mid"><div class="fac-items">`;
+    uncovered.forEach(k=>{html+=`<div class="fi"><span class="fn">${k}</span><span class="fok">○</span></div>`;});
+    html+=`</div></div></div></div>`;
+  }
   return html||'<p class="empty">소방시설 정보 없음</p>';
 }
 function tExt(r){
-  const e=r.extinguisher||{},ks=Object.keys(e);
-  if(!ks.length)return'<p class="empty">소화기구 정보 없음</p>';
-  return`<div class="eg">${ks.map(k=>`<div class="ei"><div class="en">${e[k]}</div><div class="el">${k}</div></div>`).join('')}</div>`;
+  const e=r.extinguisher||{};
+  const sections=[
+    {group:'소화기', items:[['분말소화기',e['분말소화기'],false],['소화기 기타(CO2, 할론, 강화액, K급 등)',e['소화기기타'],false]]},
+    {group:'간이소화용구', items:[['투척용',e['투척용'],false],['간이소화용구 기타(에어로졸식,소공간용,마른모래, 팽창질석, 팽창진주암)',e['간이소화용구기타'],false]]},
+    {items:[['자동확산소화기',e['자동확산소화기'],false],['자동소화장치(주거용,상업용 주방)',e['자동소화장치'],false]]},
+    {items:[['비고',e['비고'],true]]},
+  ];
+  let body='';
+  sections.forEach(sec=>{
+    const rowsHtml = sec.items.filter(([,v])=>v).map(([l,v,w])=>
+      `<div class="ir${w?' wide':''}"><div class="il">${l}</div><div class="iv">${v}</div></div>`).join('');
+    if(!rowsHtml) return; // 그룹 안에 실제 값이 하나도 없으면 그룹 헤더 자체를 안 띄운다
+    if(sec.group) body += `<div class="ig-group-hd">${sec.group}</div>`;
+    body += rowsHtml;
+  });
+  return body ? `<div class="ig">${body}</div>` : '<p class="empty">소화기구 정보 없음</p>';
 }
 function tSpec(r){
-  const spec=r.spec;
-  if(!spec||!Object.keys(spec).length)return'<p class="empty">기기사양 정보 없음</p>';
+  const spec=r.spec||{};
+  // [v58] 상세사양(Sheet4)엔 없지만 실제 보유중인 설비(소방시설현황 체크값)는 빠짐없이 보여준다.
+  const specMids = new Set();
+  Object.values(spec).forEach(mids=>Object.keys(mids).forEach(m=>{ if(m) specMids.add(m); }));
+  const fac = r.facility||{};
+  const uncovered = Object.keys(fac).filter(name=>{
+    if(!fac[name]) return false;
+    for(const m of specMids){ if(m!=='_' && m!=='기타' && (m.includes(name) || name.includes(m))) return false; }
+    return true;
+  });
+  const hasSpec = spec && Object.keys(spec).length;
+  if(!hasSpec && !uncovered.length) return '<p class="empty">기기사양 정보 없음</p>';
   let html='';
   for(const [big,mids] of Object.entries(spec)){
     const entries=Object.entries(mids);if(!entries.length)continue;
@@ -1427,6 +1391,9 @@ function tSpec(r){
       html+=`<div class="spec-items">${items.map(it=>`<div class="si${(it.vl||'').length>14?' wide':''}"><div class="si-l">${it.lb||''}</div><div class="si-v">${it.vl||''}</div></div>`).join('')}</div></div>`;
     }
     html+=`</div></div>`;
+  }
+  if(uncovered.length){
+    html+=`<div class="spec-big"><div class="spec-big-hd">⚙️ 기타 보유 설비</div><div class="spec-big-body"><div class="spec-mid-block"><div class="spec-items">${uncovered.map(n=>`<div class="si"><div class="si-l">${n}</div><div class="si-v">상세 사양 미기재 (현장 확인 필요)</div></div>`).join('')}</div></div></div></div>`;
   }
   return html||'<p class="empty">기기사양 정보 없음</p>';
 }
@@ -1484,12 +1451,20 @@ function getMergedProfile(building){
 }
 
 const BASIC_FIELD_DEFS = [
-  ['점검연도','year'],['점검종류','type'],['구분','div'],['점검월','pm'],
-  ['종합점검월','tym'],['작동점검월','twm'],['연면적','floor_area'],['건축면적','build_area'],
+  ['대상물명칭','name'],['대상물용도','usage'],['소재지','address'],
+  ['점검기간','period'],['총점검일수','pm'],
+  ['전자우편 송달 동의 여부','email_consent'],['전자우편주소','email'],['관할소방서명','jurisdiction'],
+  ['소방안전관리등급','mgr_grade'],
+  ['최근교육이수일','last_edu_date'],
+  ['소방계획서 작성여부','fire_written'],['소방계획서 보관여부','fire_kept'],
+  ['자체점검(전년도) 작동기능점검 여부','self_check_work'],['자체점검(전년도) 종합점검 여부','self_check_full'],
+  ['교육훈련 소방안전교육','edu_safety'],['교육훈련 소방훈련','edu_drill'],
+  ['화재보험 가입여부','ins_join'],['화재보험 보험사','ins_company'],['화재보험 가입기간','ins_period'],
+  ['다중이용업소 갯수','multi_use_count'],
+  ['건축허가일','build_permit_date'],['사용승인일','use_approval_date'],
+  ['연면적','floor_area'],['건축면적','build_area'],['세대수','households'],
   ['층수','floors'],['높이','height'],['건물동수','buildings'],['건축구조','structure'],
-  ['직통계단','staircase'],['승강기','elevator'],['주차장','parking'],['화재보험','insurance'],
-  ['점검기간','period'],['소재지','address'],['대상물용도','usage'],['다중이용업소','multi_use'],
-  ['소방계획서','fire_plan'],
+  ['지붕구조','roof'],['경사로','ramp'],['계단종류','stair_type'],['계단수','stair_count'],
 ];
 function esc_(v){ return (v===undefined||v===null?'':String(v)).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
@@ -1519,12 +1494,22 @@ function eFac(r){
   html+=`</div></div></div></div>`;
   return html;
 }
+const EXT_FIELD_DEFS = [
+  ['소화기', [['분말소화기','분말소화기'],['소화기 기타','소화기기타']]],
+  ['간이소화용구', [['투척용','투척용'],['간이소화용구 기타','간이소화용구기타']]],
+  [null, [['자동확산소화기','자동확산소화기'],['자동소화장치','자동소화장치']]],
+  [null, [['비고','비고']]],
+];
 function eExt(r){
-  const e = r.extinguisher||{}, ks = Object.keys(e);
-  if(!ks.length) return '<p class="empty">등록된 소화기구 항목이 없습니다. (신규 항목 추가는 관리업체 콘솔에서)</p>';
-  return `<div class="eg">${ks.map(k=>
-    `<div class="ei"><textarea class="e-input" rows="1" style="text-align:center;font-size:18px;font-weight:700;" data-field="${esc_(k)}">${esc_(e[k])}</textarea><div class="el">${k}</div></div>`
-  ).join('')}</div>`;
+  const e = r.extinguisher||{};
+  let html='';
+  EXT_FIELD_DEFS.forEach(([group,fields])=>{
+    if(group) html += `<div class="ig-group-hd">${group}</div>`;
+    fields.forEach(([label,key])=>{
+      html += `<div class="ir"><div class="il">${label}</div><textarea class="e-input" rows="1" data-field="${esc_(key)}">${esc_(e[key])}</textarea></div>`;
+    });
+  });
+  return `<div class="ig">${html}</div>`;
 }
 function eSpec(r){
   const spec = r.spec||{};
@@ -2242,7 +2227,7 @@ const MASTER_FAC_LABEL_ALIAS = {
   '비상콘센트설비':'비상콘센트설비', '상수도소화용수설비':'상수도소화용수설비', '상업용주방자동소화장치':'상업용주방자동소화장치',
   '소화수조':'소화수조', '수신기':'자동화재탐지설비', '스프링클러':'스프링클러설비', '시각경보기':'시각경보기',
   '연결살수설비':'연결살수설비', '연결송수관':'연결송수관설비', '옥내소화전':'옥내소화전설비', '옥외소화전':'옥외소화전설비',
-  '완강기':'(간이)완강기', '유도표지':'유도표지', '이산화탄소소화설비':'이산화탄소소화설비', '인명구조기구':'인명구조기구',
+  '완강기':'완강기', '유도표지':'유도표지', '이산화탄소소화설비':'이산화탄소소화설비', '인명구조기구':'인명구조기구',
   '자동화재속보기':'자동화재속보설비', '자동확산소화기':'자동확산소화기', '저수조':'저수조',
   '주거용주방자동소화장치':'주거용주방자동소화장치', '캐비닛형자동소화장치':'캐비닛형자동소화장치', '포소화설비':'포소화설비',
   '할로겐화합물 및 불활성기체 소화설비':'할로겐화합물 및 불활성기체소화설비', '휴대용비상조명등':'휴대용비상조명등'
@@ -2270,6 +2255,10 @@ function masterWingsToStructure(wings){
 // 실패하면 공백을 제거한 정규화 이름으로 한 번 더 찾는다. 단, "고 은 빌"처럼 의도적으로 공백이 들어간
 // 이름과 다른 대상물이 정규화 후 충돌할 수 있으므로, 정규화 결과가 정확히 1건으로만 매칭될 때만 채택하고
 // 2건 이상 겹치면 모호하다고 보고 매칭하지 않는다(잘못된 대상물 정보가 섞여 들어가는 것을 방지).
+// [v55] 여기에 더해, 현장에서 통상 쓰는 "약칭"(예: 강남교육청, 남목초, 강동고 등)도 그대로 입력해서
+// 찾을 수 있도록, 마스터 데이터 파일 안의 BUILDINGS_MASTER.aliases(약칭 → 공식 대상물명 매핑, 윤철주님이
+// 정리한 표 기반)를 함께 조회한다. 별칭 표는 하드코딩 대신 데이터 파일(참소방_대상물마스터_혁신소방
+// V03~) 쪽에 두어, 새 약칭이 생기면 앱 코드(이 html)를 안 건드리고 데이터 파일만 갱신하면 된다.
 function normalizeBuildingName(name){
   return (name || '').replace(/\s+/g, '');
 }
@@ -2286,13 +2275,37 @@ function getMasterNormIndex(){
   }
   return _masterNormIndex;
 }
+// [v55] 별칭(약칭) 정규화 인덱스 — BUILDINGS_MASTER.aliases = {"약칭":"공식대상물명", ...} 형태.
+// 약칭 쪽도 공백 차이가 있을 수 있으므로 정규화해서 인덱싱한다.
+let _aliasNormIndex = null;
+function getAliasNormIndex(){
+  if(_aliasNormIndex) return _aliasNormIndex;
+  _aliasNormIndex = {};
+  if(typeof BUILDINGS_MASTER !== 'undefined' && BUILDINGS_MASTER && BUILDINGS_MASTER.aliases){
+    Object.keys(BUILDINGS_MASTER.aliases).forEach(alias=>{
+      const norm = normalizeBuildingName(alias);
+      _aliasNormIndex[norm] = BUILDINGS_MASTER.aliases[alias]; // 공식 대상물명(마스터DB 키)
+    });
+  }
+  return _aliasNormIndex;
+}
 function findMasterEntryByName(name){
   if(typeof BUILDINGS_MASTER === 'undefined' || !BUILDINGS_MASTER || !BUILDINGS_MASTER.data) return null;
+  // 1) 완전 일치
   if(BUILDINGS_MASTER.data[name]) return BUILDINGS_MASTER.data[name];
   const norm = normalizeBuildingName(name);
+  // 2) 공백만 다른 경우 (예: "여진모건물" vs "여진모 건물")
   const candidates = getMasterNormIndex()[norm];
   if(candidates && candidates.length === 1) return BUILDINGS_MASTER.data[candidates[0]];
-  return null; // 매칭 없음 또는 2건 이상 충돌 — 안전하게 매칭하지 않고 넘어간다
+  // 3) 약칭 테이블 (예: "강남교육청" → "강남교육지원청")
+  const aliasTarget = getAliasNormIndex()[norm];
+  if(aliasTarget){
+    if(BUILDINGS_MASTER.data[aliasTarget]) return BUILDINGS_MASTER.data[aliasTarget];
+    const aliasNorm = normalizeBuildingName(aliasTarget);
+    const aliasCandidates = getMasterNormIndex()[aliasNorm];
+    if(aliasCandidates && aliasCandidates.length === 1) return BUILDINGS_MASTER.data[aliasCandidates[0]];
+  }
+  return null; // 매칭 없음 또는 충돌 — 안전하게 매칭하지 않고 넘어간다
 }
 // buildings.js 1건을 기준정보(BASIC_FIELD_DEFS 필드) + 시설현황(facility)으로 변환.
 // 이번 달 점검기간·층수·승강기 등 이 DB가 갖고 있지 않은 항목은 비워두어, 현장/사무실에서 보완 입력하게 한다.
@@ -2307,22 +2320,37 @@ function getPastDefectsFor(name){
 }
 function masterEntryToProfileFields(entry){
   const facility = {};
-  (entry.equip||[]).forEach(e=>{ const label = MASTER_FAC_LABEL_ALIAS[e.name]; if(label) facility[label]=true; });
+  // [v61] 별칭표(MASTER_FAC_LABEL_ALIAS)에 없는 설비명도 원문 그대로 살려서 담는다(누락 방지).
+  // 마스터DB(Sheet2)가 더 세분화된 컬럼명으로 뽑아오는 경우가 있어, 별칭표가 못 따라가더라도
+  // "기타 보유 설비"로라도 화면에 반드시 나오게 하기 위함.
+  (entry.equip||[]).forEach(e=>{ const label = MASTER_FAC_LABEL_ALIAS[e.name] || e.name; if(label) facility[label]=true; });
+  // [v62] 다중이용업소 전용 안전시설(Sheet2 65~80열) — 원본 컬럼명이 MULTI_ITEMS와 그대로 일치하므로
+  // 별도 별칭표 없이 그대로 담는다. 이 대상물이 다중이용업소가 아니면 자연히 빈 배열이라 표시 안 됨.
+  const multi_facility = {};
+  (entry.multiEquip||[]).forEach(name=>{ multi_facility[name]=true; });
   // [v45] 마스터DB 변환기(V05)가 새로 담아주는 필드 반영. 층수(floorsText)는 원본이
   // "본관 지상 5 층 / 지하 1 층\n지상 2층"처럼 줄바꿈으로 동을 구분한 자유서식 텍스트라,
   // 화면(한 줄 표시)에 그대로 넣으면 줄바꿈이 안 보여 붙어버리므로 " / "로 이어붙여 표시한다.
   const floorsDisplay = (entry.floorsText||'').split('\n').map(s=>s.trim()).filter(Boolean).join(' / ');
   return {
-    year: entry.year||'', type: entry.inspectType||'', div: entry.div||'', pm: entry.pm||'',
-    tym: entry.fullInspectMonth||'', twm: entry.workInspectMonth||'',
-    floor_area: entry.totalArea||'', build_area: entry.buildArea||'', floors: floorsDisplay,
+    name: entry.name||'', usage: entry.usage||'', address: entry.address||'',
+    period: entry.period||'', pm: entry.pm||'',
+    email_consent: entry.emailConsent||'', email: entry.email||'', jurisdiction: entry.jurisdiction||'',
+    mgr_grade: entry.mgrGrade||'', last_edu_date: entry.lastEduDate||'',
+    fire_written: entry.fireplanWritten||'', fire_kept: entry.fireplanKept||'',
+    self_check_work: entry.selfCheckWork||'', self_check_full: entry.selfCheckFull||'',
+    edu_safety: entry.eduSafety||'', edu_drill: entry.eduDrill||'',
+    ins_join: entry.insuranceJoin||'', ins_company: entry.insuranceCompany||'', ins_period: entry.insurancePeriod||'',
+    multi_use_count: entry.multiUseCount||'',
+    build_permit_date: entry.buildPermitDate||'', use_approval_date: entry.useApprovalDate||'',
+    floor_area: entry.totalArea||'', build_area: entry.buildArea||'', households: entry.households||'',
+    floors: floorsDisplay,
     height: entry.height||'', buildings: entry.buildingCount||'', structure: entry.structure||'',
-    staircase: entry.staircase||'', elevator: entry.elevator||'', parking: entry.parking||'',
-    multi_use: entry.multiUse||'', period: entry.period||'', insurance: entry.insurance||'', address: entry.address||'',
-    usage: entry.usage||'', fire_plan: entry.firePlan||'',
+    roof: entry.roof||'', ramp: entry.ramp||'',
+    stair_type: entry.stairType||'', stair_count: entry.stairCount||'',
     // [v46] 기기사양(spec) — V04~V05까지는 "부품레벨은 안정적으로 못 뽑는다"며 항상 비워뒀던 원칙을
     // 폐기하고, V06 변환기가 Sheet4(3단 헤더)를 정식으로 테이블 매핑해서 넣어준 값을 그대로 반영한다.
-    facility, multi_facility:{}, extinguisher: entry.extinguisher||{}, spec: entry.spec||{}
+    facility, multi_facility, extinguisher: entry.extinguisher||{}, spec: entry.spec||{}
   };
 }
 // "새 일정 추가"·"직접 입력해서 시작" 어디서든 대상물 화면을 열기 전에 이 함수를 먼저 불러,
@@ -2335,7 +2363,25 @@ function ensureMasterDataFor(name){
   // [v54] 정확히 일치하는 키가 없으면(예: 일정명 "여진모건물" vs DB키 "여진모 건물") 공백 제거 정규화로 재시도
   const entry = findMasterEntryByName(name);
   if(!entry) return false;
-  if(!BUILDING_PROFILES[name]) BUILDING_PROFILES[name] = masterEntryToProfileFields(entry);
+  const fresh = masterEntryToProfileFields(entry);
+  if(!BUILDING_PROFILES[name]){
+    BUILDING_PROFILES[name] = fresh;
+  } else {
+    // [v58] 예전 버전 변환기로 만들어진 프로필(예: 화정초 등 7개 손큐레이션 대상물)은
+    // "이미 있으니 통째로 스킵"하면 새로 추가된 필드(건축허가일·세대수·최근교육이수일·
+    // 전자우편 등)가 영영 안 채워진다. 기존 값은 절대 안 건드리되, 거기 "없는" 필드만
+    // 마스터DB(V08)에서 채워 넣는다.
+    const cur = BUILDING_PROFILES[name];
+    for(const k in fresh){
+      if(k === 'spec') continue; // spec은 아래서 별도 규칙
+      if(cur[k]===undefined || cur[k]===null || cur[k]==='') cur[k] = fresh[k];
+    }
+    // spec(기기사양): 마스터DB(V08, Sheet4 정식 매핑+설치위치 텍스트 정제)가 기존
+    // 손큐레이션보다 항목이 더 많으면(=더 완전하면) 통째로 교체한다.
+    const specItemCount = s => Object.values(s||{}).reduce((n,mids)=>
+      n + Object.values(mids||{}).reduce((m,items)=>m+((items&&items.length)||0), 0), 0);
+    if(specItemCount(fresh.spec) > specItemCount(cur.spec)) cur.spec = fresh.spec;
+  }
   if(!EQUIP_DB[name]) EQUIP_DB[name] = masterEquipToEquipDB(entry.equip);
   if(!BUILDING_STRUCTURE[name]) BUILDING_STRUCTURE[name] = masterWingsToStructure(entry.wings);
   return true;
