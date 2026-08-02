@@ -4419,11 +4419,7 @@ $('constructionClearBtn').onclick = async ()=>{
 
 // ================= 점검 사진대장 =================
 // ---------------------------------------------------------------------------
-// 📌 개발자용 설정: 사진대장 기본 태그 목록 (fallback 전용, v14부터)
-//    [v14] 이 배열은 더 이상 "기본값"이 아니라 EQUIP_DB에 등록되지 않은 대상물
-//    (예: 직접입력으로 새로 추가한 대상물)일 때만 쓰이는 최후의 안전장치다.
-//    실제 기본값은 아래 composePhotoAlbumTags()가 대상물별 설치 설비(EQUIP_DB)를
-//    보고 매번 새로 계산한다.
+// 📌 개발자용 설정: 사진대장 기본 태그 목록 (첫 화면 기본 표시용)
 // ---------------------------------------------------------------------------
 const DEFAULT_TAGS = [
   '수신기 기능점검','소화기 압력점검','수동발신기 작동점검','옥내소화전 함내점검',
@@ -4433,13 +4429,7 @@ const DEFAULT_TAGS = [
 ];
 
 // ---------------------------------------------------------------------------
-// 📌 [v14 신규] 사진대장 12장 구성 로직 — "기본값 + 없으면 대체" (철주 확정 2026-07-20)
-//    1~7번: 기본값(우선순위 순서) — 그 대상물에 해당 설비(EQUIP_DB)가 있으면 채택
-//    8~10번: 선택 구간(POOL 중 그 대상물에 있는 것들)
-//    11~12번: 펌프성능시험 2종 — 그 대상물에 펌프설비(주펌프 등)가 있을 때만 채택
-//    → 1~7·11~12에서 빠지는 자리가 생기면, 그만큼 POOL에서 더 끌어와 채운다.
-//    → 그래도 12장이 안 채워지면(설비가 정말 적은 소규모 대상물) 12장 미만으로 구성한다
-//      (가짜 항목을 만들어 억지로 채우지 않음).
+// 📌 사진대장 구성 로직 (대상물별 설비 연동)
 // ---------------------------------------------------------------------------
 function _equipListOf(building){ return EQUIP_DB[building] || EQUIP_DB['_default'] || []; }
 function _hasEquip(building, names){
@@ -4450,30 +4440,20 @@ function _hasEquipWithSub(building, equipName, subNames){
   if(!eq || !Array.isArray(eq.sub)) return false;
   return eq.sub.some(s => subNames.includes(s));
 }
-// [v47 버그수정] 마스터DB(203개 중 손큐레이션 7개를 뺀 나머지)는 EQUIP_DB 설비명이 뭉뚱그려져 있음
-// (예: '연기감지기'/'열감지기'로 안 나뉘고 그냥 '감지기', '피난구유도등'/'통로유도등'으로 안 나뉘고 그냥 '유도등').
-// 이 때문에 세분화된 이름만 찾던 사진대장 태그 체크가 실패해서, 실제로는 설치돼 있는데도
-// 절반 가까운 태그가 통째로 안 뜨는 버그가 있었다. 마스터DB의 뭉뚱그려진 이름도 "있는 걸로" 인정한다.
 function _hasEquipLoose(building, names){
   const aliasMap = { '연기감지기':'감지기', '열감지기':'감지기',
     '피난구유도등':'유도등', '복도통로유도등':'유도등', '계단통로유도등':'유도등', '거실통로유도등':'유도등' };
   const looseNames = names.map(n=>aliasMap[n]).filter(Boolean);
   return _hasEquip(building, names) || (looseNames.length && _hasEquip(building, looseNames));
 }
-// [v47 신규] 마스터DB 대상물은 equip[].sub가 항상 비어있어(원본 엑셀에 부속설비 상세가 없음) 기존
-// _hasPumpEquip이 절대 못 찾았다. V06에서 새로 뽑은 기기사양(entry.spec, Sheet4)에는 실제로
-// "가압송수장치" 항목(주펌프 형태·기동장치 등)이 값과 함께 들어있으므로, 이걸로도 펌프 존재를 판단한다.
 function _hasPumpSpec(building){
   if(typeof BUILDINGS_MASTER === 'undefined' || !BUILDINGS_MASTER || !BUILDINGS_MASTER.data) return false;
-  const entry = findMasterEntryByName(building); // [v54] 공백 표기 차이도 매칭
+  const entry = findMasterEntryByName(building);
   if(!entry || !entry.spec) return false;
   const common = entry.spec['수계소화설비(공통)'];
   return !!(common && common['가압송수장치'] && common['가압송수장치'].length);
 }
 function _hasPumpEquip(building){
-  // NESTED_PUMP_EQUIP(주펌프/충압펌프/예비펌프/엔진펌프/물올림장치/압력쳄버)가
-  // 옥내소화전 또는 스프링클러의 부속설비로 하나라도 있으면 펌프성능시험 대상으로 본다.
-  // (손큐레이션 7개 대상물 기준. 마스터DB 대상물은 아래 _hasPumpSpec으로 별도 판단.)
   const bySub = _equipListOf(building).some(e => Array.isArray(e.sub) && e.sub.some(s => NESTED_PUMP_EQUIP.includes(s)));
   return bySub || _hasPumpSpec(building);
 }
@@ -4499,32 +4479,42 @@ const PHOTO_ALBUM_POOL_8_10 = [
 const PHOTO_ALBUM_PUMP_11_12 = ['펌프성능시험(정격유량)','펌프성능시험(150%유량)'];
 
 function composePhotoAlbumTags(building){
-  if(!building || !EQUIP_DB[building]) return [...DEFAULT_TAGS]; // 등록 안 된 대상물은 기존 방식으로 안전하게 유지
-  // [v18 버그수정] 예전엔 8~10번 "3자리"만 채우도록 개수를 강제로 잘라서, 그 대상물에 실제
-  // 설치돼 있는 설비(예: 완강기·구조대)인데도 3자리 안에 못 들어가면 버튼 자체가 안 보이는
-  // 문제가 있었다. 이제는 "그 대상물에 실제 있는 설비"는 전부 버튼으로 보여주고, 몇 장을
-  // 최종 보고서에 넣을지는 사용자가 "포함" 체크로 고르는 몫으로 남긴다(버튼을 숨기지 않음).
+  // 대상물이 없거나 정보가 없으면 기본 DEFAULT_TAGS 반환
+  if(!building || !EQUIP_DB[building]) return [...DEFAULT_TAGS]; 
+  
   const fixedOk = PHOTO_ALBUM_FIXED_1_7.filter(x=>x.check(building)).map(x=>x.label);
   const poolOk = PHOTO_ALBUM_POOL_8_10.filter(x=>x.check(building)).map(x=>x.label);
   const pumpOk = _hasPumpEquip(building) ? PHOTO_ALBUM_PUMP_11_12 : [];
-  return [...fixedOk, ...poolOk, ...pumpOk];
+  
+  const calculated = [...fixedOk, ...poolOk, ...pumpOk];
+  
+  // 계산된 결과가 비어있거나 부족할 경우 DEFAULT_TAGS를 기반으로 안전하게 통합 제공
+  return calculated.length > 0 ? Array.from(new Set([...DEFAULT_TAGS, ...calculated])) : [...DEFAULT_TAGS];
 }
 
-let TAGS = [...DEFAULT_TAGS];  // 실제 화면에 쓰이는 목록 (대상물별 자동계산 또는 사용자 편집값)
+let TAGS = [...DEFAULT_TAGS];  // 최초 실행 시 화면에는 항상 DEFAULT_TAGS가 나타나도록 설정
 let currentTag = null;
 let photoEntries = [];
 
 async function loadTags(){
-  renderTags(); // 서버 응답을 기다리는 동안 화면이 비어 보이지 않도록, 우선 현재값으로 즉시 표시
-  const autoDefault = composePhotoAlbumTags(currentBuilding);
+  // 첫 화면 진입 시 사용자 경험을 위해 즉시 DEFAULT_TAGS 기반으로 렌더링
+  TAGS = [...DEFAULT_TAGS];
+  renderTags(); 
+
   try{
-    // [v14] 저장 키를 대상물별로 분리(photo_tag_list:{대상물명}) — 대상물마다 자동 구성 결과가
-    // 다르므로, 사용자가 직접 태그를 편집한 값도 대상물별로 따로 저장해야 서로 덮어쓰지 않는다.
     const res = await storageGet('photo_tag_list:'+currentBuilding, true);
-    TAGS = (res && res.value) ? JSON.parse(res.value) : [...autoDefault];
-  }catch(e){ TAGS = [...autoDefault]; }
+    if (res && res.value) {
+      TAGS = JSON.parse(res.value);
+    } else {
+      // 저장된 커스텀 태그가 없을 경우 대상물 맞춤형 또는 기본값 반영
+      TAGS = composePhotoAlbumTags(currentBuilding);
+    }
+  }catch(e){ 
+    TAGS = [...DEFAULT_TAGS]; 
+  }
   renderTags();
 }
+
 async function persistTags(){
   try{ await storageSet('photo_tag_list:'+currentBuilding, JSON.stringify(TAGS), true); }
   catch(e){ showToast('태그 저장 실패'); }
@@ -4539,7 +4529,7 @@ function renderTags(){
     b.onclick = ()=>{
       currentTag = tag; currentTagGroup='report'; $('tagCustom').value=''; $('otherTagCustom').value='';
       renderTags(); renderOtherTags(); updateTagCurrent();
-      $('photoInput').click(); // 태그마다 개별 촬영 버튼처럼 동작 — 탭하면 바로 카메라가 뜸
+      $('photoInput').click(); // 태그 선택 시 바로 카메라 작동
     };
     el.appendChild(b);
   });
