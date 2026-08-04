@@ -1354,8 +1354,8 @@ function tExt(r){
   const sections=[
     {group:'소화기', items:[['분말소화기',e['분말소화기'],false],['소화기 기타(CO2, 할론, 강화액, K급 등)',e['소화기기타'],false]]},
     {group:'간이소화용구', items:[['투척용',e['투척용'],false],['간이소화용구 기타(에어로졸식,소공간용,마른모래, 팽창질석, 팽창진주암)',e['간이소화용구기타'],false]]},
-    {items:[['자동확산소화기',e['자동확산소화기'],false],['자동소화장치(주거용,상업용 주방)',e['자동소화장치'],false]]},
-    {items:[['비고',e['비고'],true]]},
+    {group:'자동소화장치 등', items:[['자동확산소화기',e['자동확산소화기'],false],['자동소화장치(주거용,상업용 주방)',e['자동소화장치'],false]]},
+    {group:'비고',items:[['비고',e['비고'],true]]},
   ];
   let body='';
   sections.forEach(sec=>{
@@ -2212,13 +2212,42 @@ const MASTER_EQUIP_CAT_ALIAS = {
   '가스·분말·고체자동소화장치':'소화설비', '간이스프링클러':'수계소화설비', '거실제연설비':'소화활동설비',
   '부속실 등 제연설비':'소화활동설비', '비상경보설비':'경보설비', '상업용주방자동소화장치':'소화설비',
   '소화기':'소화설비', '스프링클러':'수계소화설비', '연결송수관':'소화활동설비', '유도등':'피난구조설비',
-  '유도표지':'피난구조설비', '할로겐화합물 및 불활성기체 소화설비':'가스계소화설비'
+  '유도표지':'피난구조설비', '할로겐화합물 및 불활성기체 소화설비':'가스계소화설비',
+  // [v64] 마스터DB가 "감지기/수신기/발신기"로 쪼개지 않고 통짜로 등록한 경우 대비
+  '자동화재탐지설비':'경보설비', '자동화재탐지설비 및 시각경보기':'경보설비'
 };
-function equipCatFor(name){ return _masterEquipCatByName[name] || MASTER_EQUIP_CAT_ALIAS[name] || '기타'; }
+// [v64] 정확매칭(위 두 표) 실패 시 무조건 '기타'로 떨어지던 문제 — 엑셀 헤더 표기가 조금만 달라져도
+// (예: "소화기구/소화기"처럼 슬래시 표기, "자동화재탐지설비"만 단독 표기 등) 매칭이 깨지는 걸
+// 막기 위해, 이름에 핵심 키워드가 포함되어 있으면 그걸로 대분류를 유추하는 방어코드를 마지막에 추가한다.
+const EQUIP_CAT_KEYWORD_FALLBACK = [
+  [/자동화재탐지|감지기|발신기|수신기|중계기|속보/, '경보설비'],
+  [/소화기/, '소화설비'],
+  [/유도등|유도표지/, '피난구조설비'],
+];
+function equipCatFor(name){
+  if(_masterEquipCatByName[name]) return _masterEquipCatByName[name];
+  if(MASTER_EQUIP_CAT_ALIAS[name]) return MASTER_EQUIP_CAT_ALIAS[name];
+  for(const [re, cat] of EQUIP_CAT_KEYWORD_FALLBACK){ if(re.test(name)) return cat; }
+  return '기타';
+}
 
 // buildings.js 설비명 → FAC_TREE(시설현황 탭 체크박스) 라벨 매핑.
 // 애매해서 잘못 체크될 수 있는 것(소화기/유도등/가스·분말·고체자동소화장치)은 매핑하지 않고 비워둔다
 // — 불량입력용 설비목록(EQUIP_DB)에는 원래 이름 그대로 들어가니 지장 없고, 시설현황 체크만 보류되는 것.
+// [v64] 마스터DB/엑셀 원본의 표기 변형(슬래시 표기, 축약형 등)을 표준 설비명으로 정규화.
+// "소화기구/소화기"·"소화기구/자확"처럼 엑셀 헤더가 FAC_TO_EQUIP_NAME 매핑표와 글자 하나라도
+// 달라 원문 그대로 등록돼버린 경우, 여기서 표준 명칭(분말소화기/자동확산소화기)으로 바로잡는다.
+// 화면 표시명 자체를 바꾸는 것이므로 시설현황·불량입력 양쪽에 공통 적용한다.
+const EQUIP_NAME_NORMALIZE = {
+  '소화기구/소화기':'분말소화기', '소화기':'분말소화기', '자확':'자동확산소화기', '소화기구/자확':'자동확산소화기',
+  '자동화재탐지설비 및 시각경보기':'자동화재탐지설비'
+};
+function normalizeEquipName(name){ return EQUIP_NAME_NORMALIZE[name] || name; }
+// [v64] 유도등처럼 마스터DB엔 세분류(계단/복도/거실/피난구) 없이 통짜 이름만 있는 경우,
+// 불량입력 2단계에 유사설비 후보를 함께 보여줘서 철주님이 현장에서 실제 종류를 고르게 한다.
+const EQUIP_SIMILAR_SUB = {
+  '유도등': ['계단통로유도등','복도통로유도등','거실통로유도등','피난구유도등']
+};
 const MASTER_FAC_LABEL_ALIAS = {
   '가스누설경보기':'가스누설경보기', '간이스프링클러':'간이스프링클러설비', '감지기':'자동화재탐지설비',
   '거실제연설비':'제연설비', '구조대':'구조대', '단독경보형감지기':'단독경보형감지기', '무선통신보조설비':'무선통신보조설비',
@@ -2235,7 +2264,10 @@ const MASTER_FAC_LABEL_ALIAS = {
 
 // buildings.js 1건의 equip 목록(name+sub)을 EQUIP_DB 항목 형식({name,cat,sub})으로 변환
 function masterEquipToEquipDB(equipList){
-  return (equipList||[]).map(e=>({ name:e.name, cat:equipCatFor(e.name), sub:(e.sub&&e.sub.length)?e.sub:null }));
+  return (equipList||[]).map(e=>{
+    const nm = normalizeEquipName(e.name);
+    return { name:nm, cat:equipCatFor(nm), sub:(e.sub&&e.sub.length)?e.sub:(EQUIP_SIMILAR_SUB[nm]||null) };
+  });
 }
 // buildings.js의 wings({동명:[층목록], ...})를 BUILDING_STRUCTURE 형식({wings:[...], floors:[...], floorsByWing:{...}})으로 변환.
 // 키가 "_전체"뿐이면 동 구분이 없는 대상물이므로 wings는 빈 배열로 둔다(기존 _default 관례와 동일).
@@ -2323,7 +2355,7 @@ function masterEntryToProfileFields(entry){
   // [v61] 별칭표(MASTER_FAC_LABEL_ALIAS)에 없는 설비명도 원문 그대로 살려서 담는다(누락 방지).
   // 마스터DB(Sheet2)가 더 세분화된 컬럼명으로 뽑아오는 경우가 있어, 별칭표가 못 따라가더라도
   // "기타 보유 설비"로라도 화면에 반드시 나오게 하기 위함.
-  (entry.equip||[]).forEach(e=>{ const label = MASTER_FAC_LABEL_ALIAS[e.name] || e.name; if(label) facility[label]=true; });
+  (entry.equip||[]).forEach(e=>{ const nm = normalizeEquipName(e.name); const label = MASTER_FAC_LABEL_ALIAS[nm] || nm; if(label) facility[label]=true; });
   // [v62] 다중이용업소 전용 안전시설(Sheet2 65~80열) — 원본 컬럼명이 MULTI_ITEMS와 그대로 일치하므로
   // 별도 별칭표 없이 그대로 담는다. 이 대상물이 다중이용업소가 아니면 자연히 빈 배열이라 표시 안 됨.
   const multi_facility = {};
@@ -2828,11 +2860,15 @@ const PUMP_SUBSUB = {
   '충압펌프': ['개폐표시형밸브','동력제어반','릴리프밸브','명판','배관','압력계','유량계'],
   '예비펌프': ['개폐표시형밸브','동력제어반','릴리프밸브','명판','배관','압력계','유량계'],
 };
+// [v64] EQUIP_SIMILAR_SUB(유도등 등, 세분류 없는 통짜 설비의 유사설비 후보)로 뜬 2단계 칩도
+// 펌프류와 동일하게 "그 자체가 실제 설비명"으로 취급 — 계단/복도/거실/피난구유도등별
+// EQUIP_DEFECT_MAP·NFTC 매핑이 그대로 적용되게 한다.
+const PROMOTE_SUB_AS_EQUIP = NESTED_PUMP_EQUIP.concat(Object.values(EQUIP_SIMILAR_SUB).flat());
 // 불량예시/NFTC/저장 시 "실제 설비명"으로 취급할 대상을 계산.
-// 2단계가 펌프류(NESTED_PUMP_EQUIP)면 그 펌프 이름 자체가 설비명이 되고(옥내소화전/스프링클러는 "소속" 역할만),
-// 3단계(구성부품)를 골랐으면 그게 세부항목이 된다. 아니면 기존처럼 1단계+2단계 그대로 사용.
+// 2단계가 펌프류(NESTED_PUMP_EQUIP)나 유사설비 후보(PROMOTE_SUB_AS_EQUIP)면 그 이름 자체가 설비명이 되고
+// (상위 1단계는 "소속" 역할만), 3단계(구성부품)를 골랐으면 그게 세부항목이 된다. 아니면 기존처럼 1단계+2단계 그대로 사용.
 function getEffectiveEquip(){
-  if(defectState.equipSub && NESTED_PUMP_EQUIP.includes(defectState.equipSub)){
+  if(defectState.equipSub && PROMOTE_SUB_AS_EQUIP.includes(defectState.equipSub)){
     return { name: defectState.equipSub, sub: defectState.equipSubSub, parent: defectState.equipPrimary };
   }
   return { name: defectState.equipPrimary, sub: defectState.equipSub, parent: null };
@@ -3746,6 +3782,7 @@ const EQUIP_MASTER_INFO = {
   "피난기구": ["피난구조설비","NFTC 301","피난기구"],
   "휴대용비상조명등": ["피난구조설비","NFTC 304","비상조명등 및 휴대용비상조명등"],
   "발신기": ["경보설비","NFTC 203","자동화재탐지설비"],
+  "자동화재탐지설비": ["경보설비","NFTC 203","자동화재탐지설비"],
   "비상벨설비": ["경보설비","NFTC 201","비상경보설비"],
   "고가수조": ["소화설비","",""],  // 동적: DYNAMIC_EQUIP_NFTC_OPTIONS
   "물올림장치": ["소화설비","",""],  // 동적: DYNAMIC_EQUIP_NFTC_OPTIONS
@@ -4419,13 +4456,21 @@ $('constructionClearBtn').onclick = async ()=>{
 
 // ================= 점검 사진대장 =================
 // ---------------------------------------------------------------------------
+// 📌 개발자용 설정: 사진대장 기본 태그 목록 (fallback 전용, v14부터)
+//    [v14] 이 배열은 더 이상 "기본값"이 아니라 EQUIP_DB에 등록되지 않은 대상물
+//    (예: 직접입력으로 새로 추가한 대상물)일 때만 쓰이는 최후의 안전장치다.
+//    실제 기본값은 아래 composePhotoAlbumTags()가 대상물별 설치 설비(EQUIP_DB)를
+//    보고 매번 새로 계산한다.
+// ---------------------------------------------------------------------------
+// ================= 점검 사진대장 =================
+// ---------------------------------------------------------------------------
 // 📌 개발자용 설정: 사진대장 기본 태그 목록 (첫 화면 기본 표시용)
 // ---------------------------------------------------------------------------
 const DEFAULT_TAGS = [
   '수신기 기능점검','소화기 압력점검','수동발신기 작동점검','옥내소화전 함내점검',
   '연기감지기 작동점검','열감지기 작동점검','유도등 점검','비상조명등 점검','고가수조 점검',
-  '방화문 기능점검','펌프성능시험(정격유량)','펌프성능시험(150%유량)','가스누설경보기 점검',
-  '완강기 점검','구조대 점검','유수검지설비 작동 점검','상수도소화설비 점검','소방펌프 자동/수동전환 운전점검','호스릴소화설비 함내점검','자동확산소화기 압력점검',
+  '방화문 기능점검','펌프성능시험(정격유량)','펌프성능시험(150%유량)','스프링클러헤드 점검',
+  '완강기 점검','구조대 점검','유수검지장치 작동 점검','상수도소화설비 점검','비상방송설비 점검',
 ];
 
 // ---------------------------------------------------------------------------
@@ -4534,7 +4579,6 @@ function renderTags(){
     el.appendChild(b);
   });
 }
-
 // ---- 기타 보관용 사진 태그 (보고서 엑셀에는 포함되지 않음, 별도 PDF용) ----
 const DEFAULT_OTHER_TAGS = ['현장 특이사항','민원 관련','안전조치 전/후','자재·부품 확인','기타'];
 let OTHER_TAGS = [...DEFAULT_OTHER_TAGS];
