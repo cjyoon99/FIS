@@ -730,6 +730,19 @@ window.onerror = function(msg, url, line, col, err){
   </div>
 </div>
 
+  <div class="view" id="view-settings">
+    <div class="section-label">오프라인 데이터 관리</div>
+    <div class="card">
+      <button type="button" class="btn-secondary" id="prefetchWeekBtn" style="width:100%;">📥 이번 주 대상물 오프라인 준비(미리 받아두기)</button>
+      <div id="prefetchStatus" style="font-size:12px;color:var(--muted);margin-top:6px;text-align:center;"></div>
+    </div>
+    <div class="card" style="margin-top:12px;">
+      <button type="button" class="btn-secondary" id="clearCacheBtn" style="width:100%;">🗑 오프라인 캐시 비우기</button>
+      <div id="cacheInfoStatus" style="font-size:12px;color:var(--muted);margin-top:6px;text-align:center;"></div>
+    </div>
+    <div class="hint" style="margin-top:12px;">오프라인 캐시는 30일이 지나면 자동으로 삭제됩니다. 서버에 이미 저장된 데이터에는 영향이 없습니다.</div>
+  </div>
+
 <div class="overlay" id="quickOverlay">
   <div class="sheet">
     <h3>빠른 전환</h3>
@@ -739,6 +752,7 @@ window.onerror = function(msg, url, line, col, err){
       <div class="qitem" data-target="defect"><span class="ic">🛠</span>불량내역 입력</div>
       <div class="qitem" data-target="schedule"><span class="ic">📅</span>일정 대시보드</div>
       <div class="qitem" data-target="buildingdetail"><span class="ic">🏢</span>대상물 상세보기</div>
+      <div class="qitem" data-target="settings"><span class="ic">⚙️</span>설정</div>
       <div class="qitem disabled"><span class="ic">📝</span>점검 보고서 작성<br><span style="font-size:10px;">(준비 중)</span></div>
     </div>
     <button class="sheet-close" id="sheetClose">닫기</button>
@@ -847,7 +861,38 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwM0P12cGqIMO3G
 
 // [v25] 배너가 실제 통신 성공/실패를 반영하도록, 마지막 호출 결과를 기억해둔다.
 let backendOnline = null; // null=아직 확인 전, true=연결됨, false=실패
-async function callAppsScript(payload){
+
+// ================= [v65] 오프라인 대비 — 쓰기 동기화 큐 =================
+// 현장에서 인터넷이 자주 끊기는데, 지금까지는 저장 요청이 실패해도 조용히 사라졌다(에러 토스트도 없이).
+// 이제부터는: set/delete/deleteMany가 네트워크 실패로 못 나가면 로컬(localStorage)에 큐로 쌓아두고,
+// (1) 온라인으로 돌아오는 순간, (2) 20초마다 자동으로, (3) "지금 동기화" 버튼으로 수동으로
+// 다시 순서대로 보낸다. 각 항목은 성공할 때까지 큐에 남아있으므로 데이터 유실이 없다.
+// 단, ui_prefs처럼 "원격값을 다시 읽어와 병합한 뒤 저장"하는 항목은 실패 시점의 스냅샷을 그대로
+// 재전송하면 그 사이 팀원이 추가한 내용을 덮어쓸 위험이 있어, 큐에 넣지 않고 대신 재시도 시
+// saveUiPrefsDebounced()를 다시 통째로 실행해(병합을 새로 함) 안전하게 처리한다.
+const SYNC_QUEUE_KEY = 'fis_sync_queue_v1';
+const WRITE_ACTIONS = new Set(['set','delete','deleteMany']);
+function loadSyncQueue(){
+  try{ const v = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY)||'[]'); return Array.isArray(v)?v:[]; }
+  catch(e){ return []; }
+}
+let syncQueue = loadSyncQueue();
+function persistSyncQueue(){ try{ localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(syncQueue)); }catch(e){} }
+function queuePendingCount(){ return syncQueue.length + (pendingUiPrefsSync?1:0); }
+function enqueueWrite(payload){
+  syncQueue.push({ payload, ts: Date.now() });
+  persistSyncQueue();
+  updateSyncBanner();
+}
+let pendingUiPrefsSync = (localStorage.getItem('fis_pending_ui_prefs_sync')==='1');
+function markUiPrefsPending(v){
+  pendingUiPrefsSync = v;
+  try{ localStorage.setItem('fis_pending_ui_prefs_sync', v?'1':'0'); }catch(e){}
+  updateSyncBanner();
+}
+
+async function callAppsScript(payload, opts){
+  opts = opts || {};
   try{
     const res = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
@@ -861,10 +906,123 @@ async function callAppsScript(payload){
   }catch(e){
     console.error('구글 백엔드 호출 실패', e);
     backendOnline = false;
+    if(!opts.noQueue && payload && WRITE_ACTIONS.has(payload.action) && payload.key !== 'ui_prefs'){
+      enqueueWrite(payload);
+    }
     updateSyncBanner();
     return null;
   }
 }
+// 큐에 쌓인 쓰기 요청을 순서대로 다시 보낸다. 도중에 또 실패하면(여전히 오프라인) 남은 항목은
+// 그대로 큐에 남겨두고 멈춘다 — 다음 기회(온라인 이벤트/주기 타이머/수동 버튼)에 이어서 재시도.
+let syncFlushing = false;
+async function flushSyncQueue(manual){
+  if(syncFlushing) return { done:0, remain:syncQueue.length };
+  syncFlushing = true;
+  let done = 0;
+  try{
+    if(pendingUiPrefsSync){
+      markUiPrefsPending(false); // 먼저 내려두고, 실패하면 saveUiPrefsDebounced가 다시 세운다
+      saveUiPrefsDebounced();
+    }
+    while(syncQueue.length){
+      const item = syncQueue[0];
+      const table = supabaseTableFor(item.payload.key) ||
+                    ((item.payload.keys && item.payload.keys.length) ? supabaseTableFor(item.payload.keys[0]) : null);
+      const res = table
+        ? await supabaseWrite(item.payload)
+        : await callAppsScript(item.payload, { noQueue:true });
+      if(res){ syncQueue.shift(); persistSyncQueue(); done++; updateSyncBanner(); }
+      else break; // 아직 오프라인 — 여기서 멈추고 다음 기회에 이어서
+    }
+  } finally { syncFlushing = false; }
+  if(manual) showToast(syncQueue.length ? `${done}건 동기화, ${syncQueue.length}건 대기중(오프라인)` : (done ? `${done}건 동기화 완료` : '동기화 대기 항목 없음'));
+  return { done, remain: syncQueue.length };
+}
+window.addEventListener('online', ()=>{ backendOnline=null; updateSyncBanner(); flushSyncQueue(false); });
+setInterval(()=>{ if(navigator.onLine!==false && (syncQueue.length||pendingUiPrefsSync)) flushSyncQueue(false); }, 20000);
+
+// [v65] 읽기 캐시 — 서버에서 성공적으로 받아온 데이터는 로컬에도 저장해두고, 다음에 오프라인이라
+// 서버 요청이 실패하면(화면이 텅 비지 않도록) 이 캐시로 대신 채운다("이번 주 대상물 준비"로 미리
+// 받아둔 데이터도 여기에 쌓인다).
+// [v66] 캐시에 저장 시각을 같이 기록해두고, 30일 지난 건 자동으로 무시(다음 조회 시 삭제)한다.
+// 캐시가 "언제 받은 데이터인지 모른 채 계속 상주"하는 문제를 막기 위함.
+const CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30일
+function lsCacheGet(key){
+  try{
+    const raw = localStorage.getItem('fis_cache_'+key);
+    if(raw == null) return null;
+    const wrapper = JSON.parse(raw);
+    if(wrapper && typeof wrapper === 'object' && 'ts' in wrapper && 'v' in wrapper){
+      if(Date.now() - wrapper.ts > CACHE_MAX_AGE_MS){
+        localStorage.removeItem('fis_cache_'+key); // 30일 지남 — 폐기
+        return null;
+      }
+      return wrapper.v;
+    }
+    return wrapper; // [구버전 호환] 타임스탬프 없이 저장된 예전 캐시는 그냥 값으로 취급
+  }catch(e){ return null; }
+}
+function lsCacheSet(key, value){
+  try{ localStorage.setItem('fis_cache_'+key, JSON.stringify({ ts: Date.now(), v: value })); }catch(e){}
+}
+// 오프라인 캐시 전체 현황(개수/가장 오래된 항목) 계산 — 설정 화면에 표시용
+function getCacheInfo(){
+  let count = 0, oldest = null;
+  for(let i=0; i<localStorage.length; i++){
+    const k = localStorage.key(i);
+    if(!k || k.indexOf('fis_cache_') !== 0) continue;
+    count++;
+    try{
+      const w = JSON.parse(localStorage.getItem(k));
+      const ts = (w && typeof w === 'object' && 'ts' in w) ? w.ts : null;
+      if(ts && (oldest === null || ts < oldest)) oldest = ts;
+    }catch(e){}
+  }
+  return { count, oldest };
+}
+// 30일 지난 캐시를 한 번에 정리(앱 시작 시 자동 실행)
+function cleanupExpiredCache(){
+  const toRemove = [];
+  for(let i=0; i<localStorage.length; i++){
+    const k = localStorage.key(i);
+    if(!k || k.indexOf('fis_cache_') !== 0) continue;
+    try{
+      const w = JSON.parse(localStorage.getItem(k));
+      const ts = (w && typeof w === 'object' && 'ts' in w) ? w.ts : null;
+      if(ts != null && Date.now() - ts > CACHE_MAX_AGE_MS) toRemove.push(k);
+    }catch(e){}
+  }
+  toRemove.forEach(k=>localStorage.removeItem(k));
+  if(toRemove.length) console.log('[캐시정리] 30일 지난 오프라인 캐시 ' + toRemove.length + '건 삭제');
+}
+cleanupExpiredCache(); // 앱 시작 시 한 번 정리
+function clearAllOfflineCache(){
+  const toRemove = [];
+  for(let i=0; i<localStorage.length; i++){
+    const k = localStorage.key(i);
+    if(k && k.indexOf('fis_cache_') === 0) toRemove.push(k);
+  }
+  toRemove.forEach(k=>localStorage.removeItem(k));
+  return toRemove.length;
+}
+function renderCacheInfo(){
+  const el = $('cacheInfoStatus'); if(!el) return;
+  const { count, oldest } = getCacheInfo();
+  if(!count){ el.textContent = '저장된 오프라인 캐시 없음'; return; }
+  const days = oldest ? Math.floor((Date.now()-oldest)/(24*60*60*1000)) : null;
+  el.textContent = `오프라인 캐시 ${count}건 저장됨` + (days!=null ? ` (가장 오래된 것: ${days}일 전)` : '') + ' — 30일 지나면 자동 삭제';
+}
+document.addEventListener('DOMContentLoaded', renderCacheInfo);
+renderCacheInfo();
+$('clearCacheBtn').onclick = ()=>{
+  const { count } = getCacheInfo();
+  if(!count){ showToast('지울 오프라인 캐시가 없습니다'); return; }
+  if(!confirm(`오프라인 캐시 ${count}건을 지우시겠습니까?\n(서버에 이미 저장된 데이터는 지워지지 않고, 이 기기에 임시로 받아둔 사본만 지워집니다. 아직 동기화 안 된 입력 대기 항목은 지워지지 않습니다.)`)) return;
+  const n = clearAllOfflineCache();
+  renderCacheInfo();
+  showToast(`오프라인 캐시 ${n}건 비웠습니다`);
+};
 
 // 사진 필드는 이미 base64(data:image/...)이면 그대로 쓰고,
 // 팀 공유 저장소로 바뀐 뒤 생긴 구글드라이브 링크(thumbnail?id=...)라면
@@ -905,46 +1063,262 @@ async function shareOrDownloadBlob(blob, filename, shareTitle){
   return false;
 }
 
+// ============================================================
+// [V66] Supabase 연동 어댑터 — 불량이력/일정/공사이력만 Supabase로,
+// 나머지는 기존 Apps Script 그대로. 위에서 추가된 오프라인 동기화 큐
+// (enqueueWrite/flushSyncQueue/lsCache)와도 이어지도록, 실패 시 큐에
+// 쌓이고 재전송될 때도 Supabase로 다시 가도록 처리한다.
+// ============================================================
+const SUPABASE_URL = 'https://oqwmytxqtegbskorbrou.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xd215dHhxdGVnYnNrb3Jicm91Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5MTg0NjEsImV4cCI6MjEwMTQ5NDQ2MX0.cL4GmoWjY1wTiwy8ThTBFWDmEc17H3uEJR_bjBQ5eAw';
+
+async function sbFetch(pathAndQuery, options){
+  options = options || {};
+  const headers = Object.assign({
+    'apikey': SUPABASE_ANON_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+    'Content-Type': 'application/json'
+  }, options.headers || {});
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + pathAndQuery, Object.assign({}, options, { headers }));
+  const text = await res.text();
+  if(!res.ok){ throw new Error('Supabase 오류 ' + res.status + ': ' + text); }
+  return text ? JSON.parse(text) : null;
+}
+
+let _buildingIdByName = {}, _buildingNameById = {}, _equipTypeIdByName = {};
+let _supabaseCachesPromise = null;
+function ensureSupabaseCaches(){
+  if(_supabaseCachesPromise) return _supabaseCachesPromise;
+  _supabaseCachesPromise = (async ()=>{
+    try{
+      const buildings = await sbFetch('buildings?select=id,name&tenant_id=eq.' + encodeURIComponent(CURRENT_TENANT_CODE));
+      (buildings||[]).forEach(b=>{ _buildingIdByName[b.name] = b.id; _buildingNameById[b.id] = b.name; });
+      const types = await sbFetch('equipment_types?select=id,name');
+      (types||[]).forEach(t=>{ _equipTypeIdByName[t.name] = t.id; });
+      backendOnline = true; updateSyncBanner();
+    }catch(e){
+      console.error('Supabase 캐시 로드 실패', e);
+      backendOnline = false; updateSyncBanner();
+      _supabaseCachesPromise = null; // 실패하면 다음 호출 때 다시 시도
+      throw e;
+    }
+  })();
+  return _supabaseCachesPromise;
+}
+
+function supabaseTableFor(key){
+  if(!key) return null;
+  if(key.indexOf('defect:') === 0) return 'defects';
+  if(key.indexOf('schedule:') === 0) return 'schedules';
+  if(key.indexOf('construction:') === 0) return 'constructions';
+  return null;
+}
+function legacyIdFromKey(key){ return key.slice(key.indexOf(':') + 1); }
+
+function defectRowToEntry(row){
+  return {
+    id: row.legacy_id, building: _buildingNameById[row.building_id] || null,
+    inspector: '', location: row.location_floor || '', detailLocation: row.detail_location || '',
+    equip: row.equip_raw || '', defectContent: row.content || '', parentEquip: null,
+    action: row.action || '조치요함', photo: row.photo_url || null,
+    inspectionType: row.inspection_type || '', inspectionDate: row.inspection_date || '',
+    inspectionId: row.inspection_id_text || '',
+    ts: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+    deleted: !!row.deleted,
+    _deletedAt: row.deleted_at ? new Date(row.deleted_at).getTime() : undefined
+  };
+}
+function entryToDefectRow(entry){
+  return {
+    legacy_id: entry.id, building_id: _buildingIdByName[entry.building] || null,
+    equipment_type_id: _equipTypeIdByName[entry.equip] || null, equip_raw: entry.equip || null,
+    location_wing: (entry.location||'').split(' ')[0] || null, location_floor: entry.location || null,
+    detail_location: entry.detailLocation || null, content: entry.defectContent || '',
+    action: entry.action || '조치요함', photo_url: entry.photo || null,
+    inspection_type: entry.inspectionType || null, inspection_date: entry.inspectionDate || null,
+    inspection_id_text: entry.inspectionId || null, deleted: !!entry.deleted,
+    deleted_at: entry._deletedAt ? new Date(entry._deletedAt).toISOString() : null
+  };
+}
+function scheduleRowToEntry(row){
+  return {
+    id: row.legacy_id, building: _buildingNameById[row.building_id] || null,
+    type: row.type || '', team: row.team || '', district: row.district || '',
+    area: row.area != null ? Number(row.area) : 0, startDate: row.start_date,
+    duration: row.duration || 1, note: row.note || '', status: row.status || 'wait',
+    statusChangedAt: row.status_changed_at ? new Date(row.status_changed_at).getTime() : undefined
+  };
+}
+function entryToScheduleRow(entry){
+  return {
+    legacy_id: entry.id, building_id: _buildingIdByName[entry.building] || null,
+    type: entry.type || null, team: entry.team || null, district: entry.district || null,
+    area: (entry.area || entry.area === 0) ? Number(entry.area) : null,
+    start_date: entry.startDate || null, duration: entry.duration || 1,
+    status: entry.status || 'wait',
+    status_changed_at: entry.statusChangedAt ? new Date(entry.statusChangedAt).toISOString() : null,
+    note: entry.note || null
+  };
+}
+function constructionRowToEntry(row){
+  return {
+    id: row.legacy_id, building: _buildingNameById[row.building_id] || null,
+    siteName: row.site_name || '', itemLabel: row.item_label || '',
+    beforePhoto: row.before_photo_url || null, afterPhoto: row.after_photo_url || null,
+    inspectionType: row.inspection_type || '', inspectionDate: row.inspection_date || '',
+    inspectionId: row.inspection_id_text || '',
+    ts: row.created_at ? new Date(row.created_at).getTime() : Date.now()
+  };
+}
+function entryToConstructionRow(entry){
+  return {
+    legacy_id: entry.id, building_id: _buildingIdByName[entry.building] || null,
+    site_name: entry.siteName || '', item_label: entry.itemLabel || '',
+    before_photo_url: entry.beforePhoto || null, after_photo_url: entry.afterPhoto || null,
+    inspection_type: entry.inspectionType || null, inspection_date: entry.inspectionDate || null,
+    inspection_id_text: entry.inspectionId || null
+  };
+}
+function rowToEntryFor(table, row){
+  if(table==='defects') return defectRowToEntry(row);
+  if(table==='schedules') return scheduleRowToEntry(row);
+  if(table==='constructions') return constructionRowToEntry(row);
+  return row;
+}
+function entryToRowFor(table, entry){
+  if(table==='defects') return entryToDefectRow(entry);
+  if(table==='schedules') return entryToScheduleRow(entry);
+  if(table==='constructions') return entryToConstructionRow(entry);
+  return entry;
+}
+
+// 오프라인 큐가 재전송할 때도 쓰는 공통 디스패처(성공하면 true 계열 값, 실패하면 null)
+async function supabaseWrite(payload){
+  const table = supabaseTableFor(payload.key) || (payload.keys && payload.keys.length ? supabaseTableFor(payload.keys[0]) : null);
+  if(!table) return null;
+  try{
+    await ensureSupabaseCaches();
+    if(payload.action === 'set'){
+      let entry; try{ entry = JSON.parse(payload.value); }catch(e){ return null; }
+      const row = entryToRowFor(table, entry);
+      await sbFetch(table + '?on_conflict=legacy_id', {
+        method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([row])
+      });
+    } else if(payload.action === 'delete'){
+      await sbFetch(table + '?legacy_id=eq.' + encodeURIComponent(legacyIdFromKey(payload.key)), { method:'DELETE' });
+    } else if(payload.action === 'deleteMany'){
+      const ids = (payload.keys||[]).map(legacyIdFromKey);
+      if(ids.length) await sbFetch(table + '?legacy_id=in.(' + ids.map(encodeURIComponent).join(',') + ')', { method:'DELETE' });
+    } else {
+      return null;
+    }
+    backendOnline = true; updateSyncBanner();
+    return { ok:true };
+  }catch(e){
+    console.error('Supabase 처리 실패', e);
+    backendOnline = false; updateSyncBanner();
+    return null;
+  }
+}
+
 async function storageGet(key, shared){
+  const table = supabaseTableFor(key);
+  if(table){
+    await ensureSupabaseCaches();
+    try{
+      const rows = await sbFetch(table + '?legacy_id=eq.' + encodeURIComponent(legacyIdFromKey(key)) + '&select=*');
+      if(rows && rows.length) return { value: JSON.stringify(rowToEntryFor(table, rows[0])) };
+      return null;
+    }catch(e){ console.error('Supabase 조회 실패', e); return null; }
+  }
   const res = await callAppsScript({ action:'get', key, shared: !!shared });
   if(res && res.value != null) return { value: res.value };
   return null;
 }
-async function storageSet(key, value, shared){
-  const res = await callAppsScript({ action:'set', key, value, shared: !!shared });
+async function storageSet(key, value, shared, opts){
+  opts = opts || {};
+  const table = supabaseTableFor(key);
+  if(table){
+    const res = await supabaseWrite({ action:'set', key, value, shared: !!shared });
+    if(!res && !opts.noQueue) enqueueWrite({ action:'set', key, value, shared: !!shared });
+    return res;
+  }
+  const res = await callAppsScript({ action:'set', key, value, shared: !!shared }, opts);
   return res;
 }
-async function storageDelete(key, shared){
-  const res = await callAppsScript({ action:'delete', key, shared: !!shared });
+async function storageDelete(key, shared, opts){
+  opts = opts || {};
+  const table = supabaseTableFor(key);
+  if(table){
+    const res = await supabaseWrite({ action:'delete', key, shared: !!shared });
+    if(!res && !opts.noQueue) enqueueWrite({ action:'delete', key, shared: !!shared });
+    return res;
+  }
+  const res = await callAppsScript({ action:'delete', key, shared: !!shared }, opts);
   return res;
 }
 // [v52] 여러 키를 한 번의 호출로 지운다(백엔드 V03의 'deleteMany' 액션 필요).
-// 건별로 storageDelete를 반복 호출하면 시트가 커질수록 느려지고, 여러 요청이 겹치면
-// 행 번호가 밀려 엉뚱한 행이 지워질 위험도 있어 이 방식으로 바꿨다.
-async function storageDeleteMany(keys, shared){
+async function storageDeleteMany(keys, shared, opts){
   if(!keys || !keys.length) return 0;
-  const res = await callAppsScript({ action:'deleteMany', keys, shared: !!shared });
-  return (res && res.deletedCount) || 0;
+  opts = opts || {};
+  const supaKeys = keys.filter(k=>supabaseTableFor(k));
+  const otherKeys = keys.filter(k=>!supabaseTableFor(k));
+  let deleted = 0;
+  if(supaKeys.length){
+    const res = await supabaseWrite({ action:'deleteMany', keys:supaKeys, shared: !!shared });
+    if(res){ deleted += supaKeys.length; }
+    else if(!opts.noQueue){ enqueueWrite({ action:'deleteMany', keys:supaKeys, shared: !!shared }); }
+  }
+  if(otherKeys.length){
+    const res = await callAppsScript({ action:'deleteMany', keys:otherKeys, shared: !!shared }, opts);
+    deleted += (res && res.deletedCount) || 0;
+  }
+  return deleted;
 }
 async function storageList(prefix, shared){
+  const table = supabaseTableFor(prefix);
+  if(table){
+    await ensureSupabaseCaches();
+    try{
+      const rows = await sbFetch(table + '?select=legacy_id');
+      const p = prefix.split(':')[0] + ':';
+      return { keys: (rows||[]).map(r=>p+r.legacy_id) };
+    }catch(e){ console.error('Supabase 목록조회 실패', e); return { keys: [] }; }
+  }
   const res = await callAppsScript({ action:'list', prefix: prefix||'', shared: !!shared });
   return { keys: (res && res.keys) || [] };
 }
 // 여러 키를 한 번에 읽어와 JSON 파싱까지 마친 값 배열로 반환 (없거나 파싱 실패한 항목은 제외)
-// - 구글 백엔드의 listValues 액션으로 한 번의 호출에 모두 받아옴(속도 최적화)
 async function storageGetMany(prefix, shared){
+  const table = supabaseTableFor(prefix);
+  if(table){
+    await ensureSupabaseCaches();
+    try{
+      const rows = await sbFetch(table + '?select=*');
+      backendOnline = true; updateSyncBanner();
+      return (rows||[]).map(r=>rowToEntryFor(table, r));
+    }catch(e){
+      console.error('Supabase 목록조회 실패', e);
+      backendOnline = false; updateSyncBanner();
+      return [];
+    }
+  }
   const res = await callAppsScript({ action:'listValues', prefix: prefix||'', shared: !!shared });
   const values = (res && res.values) || [];
   return values.map(v=>{ try{ return JSON.parse(v); }catch(e){ return null; } }).filter(Boolean);
 }
+
 
 // ---- UI 커스터마이징 저장(위치 추가, 칩 순서, 직접추가 항목) : 3인 공유 저장소 사용 ----
 let uiPrefs = { locationOverrides:{}, equipOrder:{}, customEquip:{}, subEquipOrder:{}, customSubEquip:{}, defectTagOrder:{}, customDefectTags:{}, defaultLocation:{}, locationRenames:{}, structureOverrides:{}, inspectionSession:{}, customBuildings:{}, customBuildingsDeleted:[] };
 async function loadUiPrefs(){
   try{
     const res = await storageGet('ui_prefs', true);
-    if(res && res.value){ const parsed = JSON.parse(res.value); Object.assign(uiPrefs, parsed); }
+    if(res && res.value){ const parsed = JSON.parse(res.value); Object.assign(uiPrefs, parsed); lsCacheSet('ui_prefs', uiPrefs); return; }
   }catch(e){}
+  const cached = lsCacheGet('ui_prefs'); // [v65] 오프라인이면 마지막으로 받아둔 값으로라도 채운다
+  if(cached) Object.assign(uiPrefs, cached);
 }
 const uiPrefsReady = loadUiPrefs();
 let uiPrefsSaveTimer = null;
@@ -1002,8 +1376,9 @@ function saveUiPrefsDebounced(){
         uiPrefs.customBuildings = mergedCB;
         uiPrefs.customBuildingsDeleted = [...delSet];
       }
-      await storageSet('ui_prefs', JSON.stringify(uiPrefs), true);
-    }catch(e){}
+      const res2 = await storageSet('ui_prefs', JSON.stringify(uiPrefs), true);
+      if(!res2) markUiPrefsPending(true); // [v65] 실패 — 나중에 재시도할 때 이 스냅샷을 그대로 재전송하지 않고, 병합을 처음부터 다시 함
+    }catch(e){ markUiPrefsPending(true); }
   }, 400);
 }
 function applyLocationOverrides(building){
@@ -1100,13 +1475,14 @@ function statusStage(key){ return STATUS_STAGES.find(s=>s.key===key) || STATUS_S
 
 let scheduleEntries = [];
 async function loadScheduleEntries(){
-  try{ scheduleEntries = await storageGetMany('schedule:', true); }
-  catch(e){ scheduleEntries = []; }
+  const list = await storageGetMany('schedule:', true);
+  if(backendOnline){ scheduleEntries = list; lsCacheSet('schedule', scheduleEntries); }
+  else scheduleEntries = lsCacheGet('schedule') || scheduleEntries; // [v65] 오프라인이면 캐시 유지(비우지 않음)
   if(currentView==='home') renderHome();
 }
 async function saveScheduleEntry(entry){
-  try{ await storageSet('schedule:'+entry.id, JSON.stringify(entry), true); }
-  catch(e){ showToast('저장 실패 (동기화 안 됨) - 다시 시도해주세요'); }
+  const res = await storageSet('schedule:'+entry.id, JSON.stringify(entry), true);
+  if(!res && !navigator.onLine) showToast('오프라인 - 이 기기에 저장됨(연결되면 자동 동기화)');
 }
 
 const SAMPLE_BUILDINGS = [
@@ -1181,11 +1557,18 @@ $('inspectionTypeChips').querySelectorAll('.chip').forEach(el=>{
 let currentView = 'home';
 
 function setHeader(){
-  const titles = { home:['혁신소방 현장테스트','홈'], defect:[currentBuilding||'(대상물 미선택)','🛠 불량내역 입력'], photolog:[currentBuilding||'(대상물 미선택)','📷 점검·공사 사진대장'], buildingdetail:[currentBuilding||'(대상물 미선택)','🏢 대상물 상세보기'], schedule:['소방점검 일정 대시보드','📅 월간 달력 · 드래그로 날짜 변경'] };
+  const titles = { home:['혁신소방 현장테스트','홈'], defect:[currentBuilding||'(대상물 미선택)','🛠 불량내역 입력'], photolog:[currentBuilding||'(대상물 미선택)','📷 점검·공사 사진대장'], buildingdetail:[currentBuilding||'(대상물 미선택)','🏢 대상물 상세보기'], schedule:['소방점검 일정 대시보드','📅 월간 달력 · 드래그로 날짜 변경'], settings:['설정','⚙️ 오프라인 데이터 관리'] };
   $('headerTitle').textContent = titles[currentView][0];
   $('headerSub').textContent = titles[currentView][1];
   const icons = $('headerIcons');
   icons.innerHTML = '';
+  // [v66] 설정 화면 아이콘 — 어느 화면에서든 항상 보이게(설정 화면 자체를 볼 땐 중복 방지로 숨김).
+  if(currentView !== 'settings'){
+    const gear = document.createElement('button');
+    gear.className = 'icon-btn'; gear.textContent = '⚙️'; gear.title='설정';
+    gear.onclick = ()=> goTo('settings');
+    icons.appendChild(gear);
+  }
   // [v48] 일정 대시보드로 바로 가는 📅 아이콘 — 대시보드 자체를 보고 있을 땐 안 보여줌(중복 방지).
   if(currentView !== 'schedule'){
     const cal = document.createElement('button');
@@ -1216,6 +1599,7 @@ function goTo(view){
   else if(view==='photolog'){ loadPhotoEntries(); loadConstructionEntries(); }
   else if(view==='buildingdetail') Promise.all([loadDefectEntries(), loadBuildingEdits(currentBuilding)]).then(renderBuildingDetail);
   else if(view==='schedule') loadScheduleEntries().then(sdRenderAll);
+  else if(view==='settings') renderCacheInfo();
 }
 
 function openQuickMenu(){
@@ -1237,7 +1621,7 @@ document.querySelectorAll('.qitem[data-target]').forEach(el=>{
 // (참소방_SaaS_DB스키마_V09 §6 API 스펙 참고). 프로토타입 단계라 7개 대상물만 실제 엑셀 기반 샘플로 제공.
 const FAC_TREE=[
   {big:'소화설비',icon:'🧯',mids:[
-    {mid:'소화기구 및 자동소화장치',items:['분말소화기','CO2/하론소화기(청정)','자동확산소화기','K급소화기','상업용자동소화기','주거용주방자동소화장치','상업용주방자동소화장치','캐비닛형자동소화장치']},
+    {mid:'소화기구 및 자동소화장치',items:['분말소화기','CO2/하론소화기(청정)','자동확산소화기','K급소화기','상업용자동소화기','주거용주방자동소화장치','상업용주방자동소화장치','캐비닛형자동소화장치','가스·분말·고체자동소화장치']},
     {mid:'수계소화설비',items:['옥내소화전설비','스프링클러설비','간이스프링클러설비','화재조기진압용스프링클러설비','물분무소화설비','미분무소화설비','포소화설비']},
     {mid:'가스계·분말 소화설비',items:['이산화탄소소화설비','할론소화설비','할로겐화합물 및 불활성기체소화설비','분말소화설비','강화액소화설비','고체에어로졸소화설비']},
     {mid:'옥외소화전',items:['옥외소화전설비']},
@@ -1410,20 +1794,24 @@ let BUILDING_EDITS = {}; // { [building]: {basic:{}, facility:{}, multi_facility
 let bdEditMode = null; // null | 'basic' | 'facility' | 'extinguisher' | 'spec'
 
 async function loadBuildingEdits(building){
-  try{ const res = await storageGet('building_edits:'+building, true); BUILDING_EDITS[building] = (res && res.value) ? JSON.parse(res.value) : {}; }
-  catch(e){ BUILDING_EDITS[building] = {}; }
+  const res = await storageGet('building_edits:'+building, true);
+  if(backendOnline){ BUILDING_EDITS[building] = (res && res.value) ? JSON.parse(res.value) : {}; lsCacheSet('bedit:'+building, BUILDING_EDITS[building]); }
+  else BUILDING_EDITS[building] = lsCacheGet('bedit:'+building) || BUILDING_EDITS[building] || {};
 }
 async function persistBuildingEdits(building){
-  try{ await storageSet('building_edits:'+building, JSON.stringify(BUILDING_EDITS[building]||{}), true); }catch(e){ showToast('저장 실패'); }
+  const res = await storageSet('building_edits:'+building, JSON.stringify(BUILDING_EDITS[building]||{}), true);
+  lsCacheSet('bedit:'+building, BUILDING_EDITS[building]||{}); // [v65] 오프라인이든 아니든 로컬에도 항상 반영
+  if(!res && !navigator.onLine) showToast('오프라인 - 이 기기에 저장됨(연결되면 자동 동기화)');
 }
 async function appendBuildingHistory(building, tab, tabLabel, changes){
   const entry = { ts: Date.now(), inspector: inspectorName||'', building, tab, tabLabel, changes };
-  try{ await storageSet('building_history:'+building+':'+entry.ts, JSON.stringify(entry), true); }catch(e){}
+  await storageSet('building_history:'+building+':'+entry.ts, JSON.stringify(entry), true);
   return entry;
 }
 async function loadBuildingHistoryList(building){
-  try{ return (await storageGetMany('building_history:'+building+':', true)).sort((a,b)=>b.ts-a.ts); }
-  catch(e){ return []; }
+  const list = await storageGetMany('building_history:'+building+':', true);
+  if(backendOnline){ const sorted = list.sort((a,b)=>b.ts-a.ts); lsCacheSet('bhist:'+building, sorted); return sorted; }
+  return lsCacheGet('bhist:'+building) || [];
 }
 
 function getMergedProfile(building){
@@ -1859,6 +2247,36 @@ function renderHome(){
     list.appendChild(div);
   });
 }
+// ================= [v65] "이번 주 대상물 준비" — 오프라인 대비 일괄 프리페치 =================
+// 인터넷이 끊기기 전에 이번 주 일정에 있는 대상물들의 데이터를 미리 받아 로컬(localStorage)에
+// 캐시해둔다. 팀 공용 데이터(불량기록/공사기록/사진/일정/ui_prefs)는 원래도 전체를 한 번에 받아오는
+// 구조라 한 번씩만 새로고침하면 되고, 대상물별 데이터(기준정보 수정본·변경이력)만 대상물마다 따로
+// 받아야 한다. 다 받아두면, 현장에서 인터넷이 끊겨도 화면 조회는 그대로 되고(캐시로 폴백),
+// 새로 입력하는 내용은 동기화 큐에 쌓였다가 연결되는 대로 자동 업로드된다.
+async function prefetchThisWeek(){
+  const btn = $('prefetchWeekBtn'); const statusEl = $('prefetchStatus');
+  const targets = [...new Set(activeScheduleForHome().map(e=>e.building))];
+  if(!targets.length){ showToast('이번 주 일정에 등록된 대상물이 없습니다'); return; }
+  btn.disabled = true; btn.textContent = '📥 준비 중...';
+  try{
+    statusEl.textContent = '팀 공용 데이터(불량기록·공사기록·사진·일정) 받는 중...';
+    await Promise.all([loadUiPrefs(), loadScheduleEntries(), loadDefectEntries(), loadConstructionEntries(), loadPhotoEntries()]);
+    for(let i=0;i<targets.length;i++){
+      const b = targets[i];
+      statusEl.textContent = `대상물별 데이터 받는 중... (${i+1}/${targets.length}) ${b}`;
+      ensureMasterDataFor(b); // 정적 마스터DB 기준정보/설비목록/구조는 이미 파일에 내장되어 있어 네트워크 불필요
+      await Promise.all([ loadBuildingEdits(b), loadBuildingHistoryList(b) ]);
+    }
+    const okAll = backendOnline === true;
+    statusEl.textContent = okAll
+      ? `✅ ${targets.length}개 대상물 준비 완료 (${new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})} 기준) — 이제 오프라인에서도 조회·입력 가능합니다`
+      : `⚠ 일부만 받아졌을 수 있습니다(연결 불안정) — 연결 상태 좋을 때 다시 눌러주세요`;
+    showToast(okAll ? '이번 주 대상물 준비 완료' : '연결이 불안정해 일부만 받아졌습니다');
+  } finally {
+    btn.disabled = false; btn.textContent = '📥 이번 주 대상물 오프라인 준비(미리 받아두기)';
+  }
+}
+$('prefetchWeekBtn').onclick = prefetchThisWeek;
 async function startInspection(name){
   currentBuilding = name;
   ensureMasterDataFor(name); // [v37] 이름이 대상물 마스터 DB(203개)에 있으면 기준정보/설비목록/동층구조 자동 채움
@@ -2232,7 +2650,8 @@ function equipCatFor(name){
 }
 
 // buildings.js 설비명 → FAC_TREE(시설현황 탭 체크박스) 라벨 매핑.
-// 애매해서 잘못 체크될 수 있는 것(소화기/유도등/가스·분말·고체자동소화장치)은 매핑하지 않고 비워둔다
+// 애매해서 잘못 체크될 수 있는 것(소화기/유도등)은 매핑하지 않고 비워둔다
+// ([v64] "가스·분말·고체자동소화장치"는 FAC_TREE 소화설비 항목에 직접 추가해서 커버 — 더는 여기서 제외할 필요 없음)
 // — 불량입력용 설비목록(EQUIP_DB)에는 원래 이름 그대로 들어가니 지장 없고, 시설현황 체크만 보류되는 것.
 // [v64] 마스터DB/엑셀 원본의 표기 변형(슬래시 표기, 축약형 등)을 표준 설비명으로 정규화.
 // "소화기구/소화기"·"소화기구/자확"처럼 엑셀 헤더가 FAC_TO_EQUIP_NAME 매핑표와 글자 하나라도
@@ -3260,17 +3679,24 @@ $('defectPhotoInput').onchange = async (e)=>{
 };
 let defectTrash = [];
 async function loadDefectEntries(){
-  try{
-    const all = await storageGetMany('defect:', true);
-    defectEntries = all.filter(e=>!e.deleted).sort((a,b)=>a.ts-b.ts);
-    defectTrash = all.filter(e=>e.deleted).sort((a,b)=>(a._deletedAt||0)-(b._deletedAt||0));
-  }catch(e){ defectEntries=[]; defectTrash=[]; }
+  const all = await storageGetMany('defect:', true);
+  if(backendOnline){
+    // [v65] 서버에 아직 안 올라간(동기화 대기중) 로컬 항목은 유실되지 않도록 id 기준으로 합친다.
+    const serverIds = new Set(all.map(e=>e.id));
+    const stillPending = [...defectEntries, ...defectTrash].filter(e=>e.id && !serverIds.has(e.id));
+    const merged = [...all, ...stillPending];
+    defectEntries = merged.filter(e=>!e.deleted).sort((a,b)=>a.ts-b.ts);
+    defectTrash = merged.filter(e=>e.deleted).sort((a,b)=>(a._deletedAt||0)-(b._deletedAt||0));
+  } else {
+    defectEntries = lsCacheGet('defects') || defectEntries; // [v65] 오프라인 — 캐시/현재 메모리 유지(비우지 않음)
+    defectTrash = lsCacheGet('defectTrash') || defectTrash;
+  }
   renderDefectEntries();
 }
 // 항목 하나만 공유저장소에 기록(다른 사람의 다른 항목과 절대 충돌하지 않음 - id별 개별 키)
 async function saveDefectEntry(entry){
-  try{ await storageSet('defect:'+entry.id, JSON.stringify(entry), true); }
-  catch(e){ showToast('저장 실패 (동기화 안 됨) - 다시 시도해주세요'); }
+  const res = await storageSet('defect:'+entry.id, JSON.stringify(entry), true);
+  if(!res && !navigator.onLine) showToast('오프라인 - 이 기기에 저장됨(연결되면 자동 동기화)');
 }
 // ================= 엑셀 불량내역 역마이그레이션 (v28) =================
 // 참소방_불량내역엑셀_출력규칙에 맞춰 출력된 "소방시설등 시정보완 조치명령 사항" 형태의
@@ -3482,6 +3908,9 @@ function fmtEntryDateTime(ts){
   return `${date} ${time}`;
 }
 function renderDefectEntries(){
+  // [v65] 화면을 그릴 때마다 현재 상태를 로컬 캐시에도 저장해둔다 — 오프라인 중 입력한 내용이
+  // 아직 서버 동기화 전이라도(큐 대기중이라도) 새로고침/재접속 시 사라지지 않게 한다.
+  lsCacheSet('defects', defectEntries); lsCacheSet('defectTrash', defectTrash);
   // [v22 버그수정] 대상물을 옮기면 그 전 대상물의 불량내역까지 같이 보이던 문제 — 반드시
   // currentBuilding으로 필터링한다. (전체 데이터 자체는 defectEntries에 계속 다 들어있고,
   // 엑셀 생성 등 다른 곳에서도 쓰이므로 배열 자체를 자르지 않고 화면 표시만 필터링한다.)
@@ -4338,12 +4767,20 @@ let constructionBeforePhoto = null;
 let constructionAfterPhoto = null;
 
 async function loadConstructionEntries(){
-  try{ constructionEntries = (await storageGetMany('construction:', true)).sort((a,b)=>a.ts-b.ts); }catch(e){ constructionEntries=[]; }
+  const list = await storageGetMany('construction:', true);
+  if(backendOnline){
+    const serverIds = new Set(list.map(e=>e.id));
+    const stillPending = constructionEntries.filter(e=>e.id && !serverIds.has(e.id));
+    constructionEntries = [...list, ...stillPending].sort((a,b)=>a.ts-b.ts);
+    lsCacheSet('construction', constructionEntries);
+  } else {
+    constructionEntries = lsCacheGet('construction') || constructionEntries;
+  }
   renderConstructionEntries();
 }
 async function saveConstructionEntry(entry){
-  try{ await storageSet('construction:'+entry.id, JSON.stringify(entry), true); }
-  catch(e){ showToast('저장 실패 (동기화 안 됨) - 다시 시도해주세요'); }
+  const res = await storageSet('construction:'+entry.id, JSON.stringify(entry), true);
+  if(!res && !navigator.onLine) showToast('오프라인 - 이 기기에 저장됨(연결되면 자동 동기화)');
 }
 async function deleteConstructionEntry(id){
   try{ await storageDelete('construction:'+id, true); }catch(e){}
@@ -4352,6 +4789,7 @@ async function deleteConstructionEntry(id){
 // 팀원 동기화를 위해 계속 로드해둠), 화면에는 "지금 보고 있는 대상물" 것만 필터링해 보여준다.
 // 불량내역/점검사진대장과 동일한 패턴(entry.building===currentBuilding).
 function renderConstructionEntries(){
+  lsCacheSet('construction', constructionEntries); // [v65] 로컬 변경분도 즉시 캐시에 반영
   $('constructionBuildingLabel').textContent = currentBuilding || '(대상물 미선택)';
   const buildingEntries = constructionEntries.filter(en=>en.building===currentBuilding);
   $('constructionCount').textContent = buildingEntries.length;
@@ -4806,16 +5244,22 @@ $('photoInput').onchange = async (e)=>{
 };
 let photoTrash = [];
 async function loadPhotoEntries(){
-  try{
-    const all = await storageGetMany('photo:', true);
-    photoEntries = all.filter(e=>!e.deleted).sort((a,b)=>a.ts-b.ts);
-    photoTrash = all.filter(e=>e.deleted).sort((a,b)=>(a._deletedAt||0)-(b._deletedAt||0));
-  }catch(e){ photoEntries=[]; photoTrash=[]; }
+  const all = await storageGetMany('photo:', true);
+  if(backendOnline){
+    // [v65] 사진은 용량이 커서 localStorage에 통째로 영구 캐시하진 않지만, 서버에 아직 안 올라간
+    // (동기화 대기중) 로컬 항목이 재조회 시 사라지지 않도록 id 기준으로는 병합해둔다.
+    const serverIds = new Set(all.map(e=>e.id));
+    const stillPending = [...photoEntries, ...photoTrash].filter(e=>e.id && !serverIds.has(e.id));
+    const merged = [...all, ...stillPending];
+    photoEntries = merged.filter(e=>!e.deleted).sort((a,b)=>a.ts-b.ts);
+    photoTrash = merged.filter(e=>e.deleted).sort((a,b)=>(a._deletedAt||0)-(b._deletedAt||0));
+  }
+  // 오프라인이면(backendOnline===false) 지금 메모리에 있는 값을 그대로 유지 — 비우지 않음
   renderPhotoEntries();
 }
 async function savePhotoEntry(entry){
-  try{ await storageSet('photo:'+entry.id, JSON.stringify(entry), true); }
-  catch(e){ showToast('저장 실패 (동기화 안 됨) - 다시 시도해주세요'); }
+  const res = await storageSet('photo:'+entry.id, JSON.stringify(entry), true);
+  if(!res && !navigator.onLine) showToast('오프라인 - 이 기기에 저장됨(연결되면 자동 동기화)');
 }
 async function deletePhotoEntry(id){
   try{ await storageDelete('photo:'+id, true); }catch(e){}
@@ -5064,26 +5508,36 @@ $('photoClearBtn').onclick = async ()=>{
 // ---------------- 3인 공유 동기화 ----------------
 function updateSyncBanner(){
   const el = $('syncBanner');
+  const pending = queuePendingCount();
+  const pendingSuffix = pending ? ` · ⏳ 동기화 대기 ${pending}건(눌러서 재시도)` : '';
   // [v25 버그수정] 예전엔 실제 연결 여부와 무관하게 항상 "연결됨"이라는 고정 문구만 표시했다.
   // 이제 callAppsScript() 호출이 실제로 성공/실패했는지(backendOnline)를 반영한다.
-  if(backendOnline === true){
+  // [v65] 오프라인 중 저장 못 한 항목이 있으면(대기 큐) 그 건수도 함께 보여주고, 배너를 누르면
+  // 바로 재전송을 시도한다 — 인터넷이 자주 끊기는 현장에서 "지금 동기화됐나?"를 항상 확인 가능하게.
+  if(pending){
+    el.className = 'sync-banner';
+    el.style.background = '#fff4e5'; el.style.color = '#8a5a00';
+    el.textContent = `🟠 오프라인 중 저장된 항목이 있습니다${pendingSuffix}`;
+  } else if(backendOnline === true){
     el.className = 'sync-banner shared';
     el.textContent = '🟢 팀 공유 저장소(구글) 연결 확인됨 — 같은 파일을 연 팀원과 실시간에 가깝게 공유되고 있습니다';
   } else if(backendOnline === false){
     el.className = 'sync-banner';
     el.style.background = '#fdecea'; el.style.color = '#b3261e';
-    el.textContent = '🔴 팀 공유 저장소 연결 실패 — 지금 입력하는 내용이 팀원과 공유되지 않고 있습니다. 인터넷 연결을 확인해주세요';
+    el.textContent = '🔴 팀 공유 저장소 연결 실패 — 입력한 내용은 이 기기에 안전하게 저장되어 있고, 연결되면 자동으로 올라갑니다(눌러서 지금 재시도)';
   } else {
     el.className = 'sync-banner';
     el.style.background=''; el.style.color='';
     el.textContent = '🟡 팀 공유 저장소 연결 확인 중...';
   }
+  el.style.cursor = 'pointer';
+  el.onclick = ()=> flushSyncQueue(true);
 }
 // 페이지를 열자마자 실제로 한 번 통신해서 진짜 연결 상태를 확인한다(껍데기 표시가 아니라).
 callAppsScript({ action:'list', prefix:'', shared:true });
-$('defectSyncBtn').onclick = async ()=>{ showToast('동기화 중...'); await loadDefectEntries(); showToast('동기화 완료'); };
-$('photoSyncBtn').onclick = async ()=>{ showToast('동기화 중...'); await loadPhotoEntries(); showToast('동기화 완료'); };
-$('constructionSyncBtn').onclick = async ()=>{ showToast('동기화 중...'); await loadConstructionEntries(); showToast('동기화 완료'); };
+$('defectSyncBtn').onclick = async ()=>{ showToast('동기화 중...'); await flushSyncQueue(false); await loadDefectEntries(); showToast('동기화 완료'); };
+$('photoSyncBtn').onclick = async ()=>{ showToast('동기화 중...'); await flushSyncQueue(false); await loadPhotoEntries(); showToast('동기화 완료'); };
+$('constructionSyncBtn').onclick = async ()=>{ showToast('동기화 중...'); await flushSyncQueue(false); await loadConstructionEntries(); showToast('동기화 완료'); };
 // 지금 보고 있는 화면 데이터를 주기적으로 자동으로 다시 불러와, 팀원이 방금 올린 항목이 반영되게 함
 let scheduleBusy = false; // [v52] 초기화/임포트가 진행 중일 때는 20초 주기 새로고침이 끼어들어 뒤섞이지 않게 막는 플래그
 setInterval(()=>{
