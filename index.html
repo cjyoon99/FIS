@@ -303,7 +303,7 @@ window.onerror = function(msg, url, line, col, err){
 <script>
   var TENANT_FILES = {
     '7N040I': { name:'혁신소방',   file:'참소방_대상물마스터_혁신소방_latest.js' },
-    'ANW4L1': { name:'(테스트용)', file:'참소방_대상물마스터_테스트_latest.js' }, // [V75/F단계] 멀티테넌트 검증용
+    'ANW4L1': { name:'(미배정)',   file:null },
     'WWLQVE': { name:'(미배정)',   file:null },
     '3HGB9N': { name:'(미배정)',   file:null },
     '1BFVWW': { name:'(미배정)',   file:null },
@@ -1033,22 +1033,6 @@ const _photoBase64Cache = {};
 async function resolvePhotoToBase64(photoValue){
   if(!photoValue) return null;
   if(photoValue.indexOf('data:image') === 0) return photoValue; // 이미 base64
-  // [V67] Supabase Storage 공개 URL — 직접 fetch해서 base64로 변환(공개 버킷이라 CORS 허용됨)
-  if(photoValue.indexOf(SUPABASE_URL) === 0){
-    if(_photoBase64Cache[photoValue]) return _photoBase64Cache[photoValue];
-    try{
-      const res = await fetch(photoValue);
-      const blob = await res.blob();
-      const dataUrl = await new Promise((resolve, reject)=>{
-        const reader = new FileReader();
-        reader.onload = ()=>resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      _photoBase64Cache[photoValue] = dataUrl;
-      return dataUrl;
-    }catch(e){ console.error('Storage 사진 변환 실패', e); return null; }
-  }
   const m = photoValue.match(/[?&]id=([^&]+)/);
   const fileId = m ? m[1] : null;
   if(!fileId) return null; // 알 수 없는 형식이면 이미지 없이 진행(캡션은 유지)
@@ -1084,10 +1068,6 @@ async function shareOrDownloadBlob(blob, filename, shareTitle){
 // 나머지는 기존 Apps Script 그대로. 위에서 추가된 오프라인 동기화 큐
 // (enqueueWrite/flushSyncQueue/lsCache)와도 이어지도록, 실패 시 큐에
 // 쌓이고 재전송될 때도 Supabase로 다시 가도록 처리한다.
-// [V67] 사진현황 로그(photo: 키)도 photos 테이블로 연결, 그리고 불량이력/공사이력/
-// 사진현황 로그의 사진 필드는 이제 base64를 그대로 DB에 넣지 않고 Supabase Storage
-// (photos 버킷)에 실제 파일로 올린 뒤 그 공개 URL만 저장한다(maybeUploadBase64 참고).
-// 태그/소방시설현황수정/공통설정은 여전히 Apps Script 그대로(C단계에서 처리 예정).
 // ============================================================
 const SUPABASE_URL = 'https://oqwmytxqtegbskorbrou.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xd215dHhxdGVnYnNrb3Jicm91Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5MTg0NjEsImV4cCI6MjEwMTQ5NDQ2MX0.cL4GmoWjY1wTiwy8ThTBFWDmEc17H3uEJR_bjBQ5eAw';
@@ -1106,9 +1086,6 @@ async function sbFetch(pathAndQuery, options){
 }
 
 let _buildingIdByName = {}, _buildingNameById = {}, _equipTypeIdByName = {};
-// [V70/D단계②] 하분류(equipment_subtypes)/구성부품(equipment_details) 캐시.
-// 이름이 여러 상위 아래서 겹칠 수 있어(예: '개폐표시형밸브'), "상위ID|이름"을 키로 쓴다.
-let _equipSubtypeIdByTypeAndName = {}, _equipDetailIdBySubtypeAndName = {};
 let _supabaseCachesPromise = null;
 function ensureSupabaseCaches(){
   if(_supabaseCachesPromise) return _supabaseCachesPromise;
@@ -1118,10 +1095,6 @@ function ensureSupabaseCaches(){
       (buildings||[]).forEach(b=>{ _buildingIdByName[b.name] = b.id; _buildingNameById[b.id] = b.name; });
       const types = await sbFetch('equipment_types?select=id,name');
       (types||[]).forEach(t=>{ _equipTypeIdByName[t.name] = t.id; });
-      const subtypes = await sbFetch('equipment_subtypes?select=id,name,equipment_type_id');
-      (subtypes||[]).forEach(s=>{ _equipSubtypeIdByTypeAndName[s.equipment_type_id + '|' + s.name] = s.id; });
-      const details = await sbFetch('equipment_details?select=id,name,equipment_subtype_id');
-      (details||[]).forEach(d=>{ _equipDetailIdBySubtypeAndName[d.equipment_subtype_id + '|' + d.name] = d.id; });
       backendOnline = true; updateSyncBanner();
     }catch(e){
       console.error('Supabase 캐시 로드 실패', e);
@@ -1133,85 +1106,12 @@ function ensureSupabaseCaches(){
   return _supabaseCachesPromise;
 }
 
-// [V76/F단계] 마스터DB(203개)에 없는 새 대상물명으로 일정/불량이력 등을 저장하려 하면
-// building_id가 NOT NULL이라 예전엔 무조건 실패했다. 캐시에 없으면 그 자리에서 buildings에
-// 새로 등록하고 그 id를 쓴다(대상물 마스터 파일 안 건드리고도 새 현장 입력이 가능해짐).
-async function resolveBuildingId(name){
-  if(!name) return null;
-  if(_buildingIdByName[name]) return _buildingIdByName[name];
-  try{
-    const existing = await sbFetch('buildings?select=id&tenant_id=eq.' + encodeURIComponent(CURRENT_TENANT_CODE) + '&name=eq.' + encodeURIComponent(name));
-    if(existing && existing.length){
-      _buildingIdByName[name] = existing[0].id; _buildingNameById[existing[0].id] = name;
-      return existing[0].id;
-    }
-    const created = await sbFetch('buildings', {
-      method: 'POST', headers: { 'Prefer': 'return=representation' },
-      body: JSON.stringify([{ tenant_id: CURRENT_TENANT_CODE, name }])
-    });
-    if(created && created[0]){
-      _buildingIdByName[name] = created[0].id; _buildingNameById[created[0].id] = name;
-      return created[0].id;
-    }
-  }catch(e){ console.error('건물 자동등록 실패:', name, e); }
-  return null;
-}
-
 function supabaseTableFor(key){
   if(!key) return null;
   if(key.indexOf('defect:') === 0) return 'defects';
   if(key.indexOf('schedule:') === 0) return 'schedules';
   if(key.indexOf('construction:') === 0) return 'constructions';
-  if(key.indexOf('photo:') === 0) return 'photos';
-  // [V68/C단계]
-  if(key === 'ui_prefs') return 'ui_prefs';
-  if(key.indexOf('photo_tag_list:') === 0) return 'tag_sets';
-  if(key === 'photo_other_tag_list') return 'tag_sets';
-  if(key.indexOf('building_edits:') === 0) return 'building_facility_edits';
-  if(key.indexOf('building_history:') === 0) return 'building_edit_history';
   return null;
-}
-
-// ---- [V67] 사진 Storage 업로드 헬퍼 ----------------------------------
-// base64(data:image/...) 값을 Supabase Storage(photos 버킷)에 실제 파일로 올리고
-// 공개 URL을 돌려준다. 이미 URL이거나 값이 없으면 그대로 통과시킨다.
-// 실패하면(오프라인 등) base64를 그대로 반환해 데이터 유실은 막는다(안전망 원칙).
-const STORAGE_BUCKET = 'photos';
-function dataUrlToBlob(dataUrl){
-  const comma = dataUrl.indexOf(',');
-  const meta = dataUrl.slice(0, comma);
-  const b64 = dataUrl.slice(comma + 1);
-  const mimeMatch = meta.match(/data:(.*?);base64/);
-  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
-  return new Blob([bytes], { type: mime });
-}
-async function uploadImageToStorage(dataUrl, path){
-  const blob = dataUrlToBlob(dataUrl);
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
-    method: 'POST',
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-      'Content-Type': blob.type,
-      'x-upsert': 'true'
-    },
-    body: blob
-  });
-  if(!res.ok){ const t = await res.text(); throw new Error('Storage 업로드 실패 ' + res.status + ': ' + t); }
-  return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${path}`;
-}
-async function maybeUploadBase64(dataUrl, pathNoExt){
-  if(!dataUrl || dataUrl.indexOf('data:image') !== 0) return dataUrl; // 이미 URL이거나 없음
-  try{
-    const ext = dataUrl.indexOf('image/png') > -1 ? 'png' : 'jpg';
-    return await uploadImageToStorage(dataUrl, `${pathNoExt}.${ext}`);
-  }catch(e){
-    console.error('사진 Storage 업로드 실패, base64로 대체 저장', e);
-    return dataUrl; // 실패해도 저장 자체는 진행(예전 방식으로 폴백)
-  }
 }
 function legacyIdFromKey(key){ return key.slice(key.indexOf(':') + 1); }
 
@@ -1219,10 +1119,7 @@ function defectRowToEntry(row){
   return {
     id: row.legacy_id, building: _buildingNameById[row.building_id] || null,
     inspector: '', location: row.location_floor || '', detailLocation: row.detail_location || '',
-    equip: row.equip_raw || '', defectContent: row.content || '',
-    // [V69/D단계] 예전엔 항상 null로 하드코딩되어 있었음 — 이제 실제로 컬럼에서 복원한다.
-    equipName: row.equip_name || null, equipSub: row.equip_sub || null,
-    parentEquip: row.parent_equip || null,
+    equip: row.equip_raw || '', defectContent: row.content || '', parentEquip: null,
     action: row.action || '조치요함', photo: row.photo_url || null,
     inspectionType: row.inspection_type || '', inspectionDate: row.inspection_date || '',
     inspectionId: row.inspection_id_text || '',
@@ -1231,45 +1128,13 @@ function defectRowToEntry(row){
     _deletedAt: row.deleted_at ? new Date(row.deleted_at).getTime() : undefined
   };
 }
-async function entryToDefectRow(entry){
-  // [V67] base64로 들어온 사진은 Supabase Storage에 실제 파일로 올리고 URL만 저장한다
-  // (예전엔 base64 그대로 photo_url 텍스트 컬럼에 박아 넣고 있었음 — 용량/속도 문제의 원인).
-  const photoUrl = await maybeUploadBase64(entry.photo, `${CURRENT_TENANT_CODE}/defects/${entry.id}`);
-  // [V69/D단계①] "설비명" 예전엔 entry.equip(합쳐진 문자열, 예:"옥내소화전 소화전함")로 equipment_types를
-  // 조회해서 부속항목이 있는 경우 거의 항상 매칭 실패했다. 이제 실제 "중분류" 이름으로만 조회한다.
-  // 펌프류(주펌프/충압펌프 등)처럼 부속설비가 승격되어 equipName 자리에 온 경우엔 parentEquip이
-  // 진짜 중분류(옥내소화전/스프링클러)이므로 그쪽을 우선 사용한다.
-  // [V72] parentEquip이 있어도 두 가지 경우가 섞여있다:
-  //  (a) 진짜 펌프류 승격 — equipName('주펌프' 등)은 중분류가 아니라 하분류라 parentEquip이 꼭 필요함
-  //  (b) 유도등류 승격 — equipName('피난구유도등' 등)이 이미 그 자체로 정식 중분류라 parentEquip 없이도 매칭됨
-  // equipName이 이미 중분류 이름으로 매칭되면 (b)로 보고 그대로 쓰고, 안 되면 (a)로 보고 parentEquip을 쓴다.
-  const equipNameIsRealType = !!_equipTypeIdByName[entry.equipName];
-  const isPromotedSubtype = !!entry.parentEquip && !equipNameIsRealType;
-  const equipTypeName = isPromotedSubtype ? entry.parentEquip : entry.equipName;
-  const equipTypeId = _equipTypeIdByName[equipTypeName] || null;
-  // [V70/D단계②] 중분류를 찾았으면 그 아래서 하분류(부속설비), 그 아래서 구성부품(4단계)까지 매칭.
-  // 일반 경우: equipName=중분류, equipSub=하분류(더 아래 없음).
-  // 펌프 승격 경우: equipName 자체가 하분류(예:'주펌프'), equipSub가 그 밑 구성부품(예:'압력계').
-  let equipSubtypeId = null, equipDetailId = null;
-  if(equipTypeId){
-    const subtypeName = isPromotedSubtype ? entry.equipName : entry.equipSub;
-    if(subtypeName){
-      equipSubtypeId = _equipSubtypeIdByTypeAndName[equipTypeId + '|' + subtypeName] || null;
-      const detailName = isPromotedSubtype ? entry.equipSub : null; // 4단계는 펌프 승격 경우에만 존재
-      if(equipSubtypeId && detailName){
-        equipDetailId = _equipDetailIdBySubtypeAndName[equipSubtypeId + '|' + detailName] || null;
-      }
-    }
-  }
+function entryToDefectRow(entry){
   return {
-    legacy_id: entry.id, tenant_id: CURRENT_TENANT_CODE, building_id: await resolveBuildingId(entry.building),
-    equipment_type_id: equipTypeId, equip_raw: entry.equip || null,
-    equipment_subtype_id: equipSubtypeId, equipment_detail_id: equipDetailId,
-    equip_name: entry.equipName || null, equip_sub: entry.equipSub || null,
-    parent_equip: entry.parentEquip || null,
+    legacy_id: entry.id, building_id: _buildingIdByName[entry.building] || null,
+    equipment_type_id: _equipTypeIdByName[entry.equip] || null, equip_raw: entry.equip || null,
     location_wing: (entry.location||'').split(' ')[0] || null, location_floor: entry.location || null,
     detail_location: entry.detailLocation || null, content: entry.defectContent || '',
-    action: entry.action || '조치요함', photo_url: photoUrl || null,
+    action: entry.action || '조치요함', photo_url: entry.photo || null,
     inspection_type: entry.inspectionType || null, inspection_date: entry.inspectionDate || null,
     inspection_id_text: entry.inspectionId || null, deleted: !!entry.deleted,
     deleted_at: entry._deletedAt ? new Date(entry._deletedAt).toISOString() : null
@@ -1284,9 +1149,9 @@ function scheduleRowToEntry(row){
     statusChangedAt: row.status_changed_at ? new Date(row.status_changed_at).getTime() : undefined
   };
 }
-async function entryToScheduleRow(entry){
+function entryToScheduleRow(entry){
   return {
-    legacy_id: entry.id, tenant_id: CURRENT_TENANT_CODE, building_id: await resolveBuildingId(entry.building),
+    legacy_id: entry.id, building_id: _buildingIdByName[entry.building] || null,
     type: entry.type || null, team: entry.team || null, district: entry.district || null,
     area: (entry.area || entry.area === 0) ? Number(entry.area) : null,
     start_date: entry.startDate || null, duration: entry.duration || 1,
@@ -1305,141 +1170,26 @@ function constructionRowToEntry(row){
     ts: row.created_at ? new Date(row.created_at).getTime() : Date.now()
   };
 }
-async function entryToConstructionRow(entry){
-  const beforeUrl = await maybeUploadBase64(entry.beforePhoto, `${CURRENT_TENANT_CODE}/constructions/${entry.id}-before`);
-  const afterUrl  = await maybeUploadBase64(entry.afterPhoto,  `${CURRENT_TENANT_CODE}/constructions/${entry.id}-after`);
+function entryToConstructionRow(entry){
   return {
-    legacy_id: entry.id, tenant_id: CURRENT_TENANT_CODE, building_id: await resolveBuildingId(entry.building),
+    legacy_id: entry.id, building_id: _buildingIdByName[entry.building] || null,
     site_name: entry.siteName || '', item_label: entry.itemLabel || '',
-    before_photo_url: beforeUrl || null, after_photo_url: afterUrl || null,
+    before_photo_url: entry.beforePhoto || null, after_photo_url: entry.afterPhoto || null,
     inspection_type: entry.inspectionType || null, inspection_date: entry.inspectionDate || null,
     inspection_id_text: entry.inspectionId || null
-  };
-}
-// [V67] 사진현황 로그(photolog, photo: 키) — photos 테이블 매핑
-function photoRowToEntry(row){
-  return {
-    id: row.legacy_id, building: _buildingNameById[row.building_id] || null,
-    tag: row.tag || '', group: row.tag_group || 'report',
-    photo: row.photo_url || null,
-    ts: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-    include: row.included !== false,
-    inspectionType: row.inspection_type || '', inspectionDate: row.inspection_date || '',
-    inspectionId: row.inspection_id_text || '',
-    deleted: !!row.deleted,
-    _deletedAt: row.deleted_at ? new Date(row.deleted_at).getTime() : undefined
-  };
-}
-async function entryToPhotoRow(entry){
-  const photoUrl = await maybeUploadBase64(entry.photo, `${CURRENT_TENANT_CODE}/photolog/${entry.id}`);
-  return {
-    legacy_id: entry.id, tenant_id: CURRENT_TENANT_CODE,
-    building_id: await resolveBuildingId(entry.building),
-    tag: entry.tag || null, tag_group: entry.group || 'report',
-    photo_url: photoUrl || null,
-    included: entry.include !== false,
-    inspection_type: entry.inspectionType || null, inspection_date: entry.inspectionDate || null,
-    inspection_id_text: entry.inspectionId || null,
-    deleted: !!entry.deleted,
-    deleted_at: entry._deletedAt ? new Date(entry._deletedAt).toISOString() : null
   };
 }
 function rowToEntryFor(table, row){
   if(table==='defects') return defectRowToEntry(row);
   if(table==='schedules') return scheduleRowToEntry(row);
   if(table==='constructions') return constructionRowToEntry(row);
-  if(table==='photos') return photoRowToEntry(row);
-  if(table==='ui_prefs') return uiPrefsRowToEntry(row);
-  if(table==='building_facility_edits') return buildingFacilityEditRowToEntry(row);
-  if(table==='building_edit_history') return buildingEditHistoryRowToEntry(row);
   return row;
 }
-// [V67] 사진 업로드가 비동기라 entryToRowFor 전체를 async로 변경 (호출부도 await 필요)
-// [V68/C단계] key도 같이 받는다 — ui_prefs/building_facility_edits처럼 entry 자체엔
-// 대상물명 등 식별정보가 없고 key(예: 'building_edits:서면빌딩')에만 들어있는 경우가 있어서.
-// (tag_sets는 태그 1개당 1행 구조라 이 공용 경로를 안 타고 storageGet/supabaseWrite에서 직접 처리한다)
-async function entryToRowFor(table, entry, key){
-  if(table==='defects') return await entryToDefectRow(entry);
-  if(table==='schedules') return await entryToScheduleRow(entry);
-  if(table==='constructions') return await entryToConstructionRow(entry);
-  if(table==='photos') return await entryToPhotoRow(entry);
-  if(table==='ui_prefs') return entryToUiPrefsRow(entry);
-  if(table==='building_facility_edits') return await entryToBuildingFacilityEditRow(entry, key);
-  if(table==='building_edit_history') return await entryToBuildingEditHistoryRow(entry, key);
+function entryToRowFor(table, entry){
+  if(table==='defects') return entryToDefectRow(entry);
+  if(table==='schedules') return entryToScheduleRow(entry);
+  if(table==='constructions') return entryToConstructionRow(entry);
   return entry;
-}
-
-// ---- [V68/C단계] ui_prefs (공통설정) — 단일 행, entry가 곧 uiPrefs 객체 전체 ----
-function uiPrefsRowToEntry(row){ return row.data || {}; }
-function entryToUiPrefsRow(entry){
-  return { legacy_id: tenantScopedLegacyId('ui_prefs'), tenant_id: CURRENT_TENANT_CODE, data: entry };
-}
-
-// ---- [V68/C단계 → V71 수정] tag_sets (태그)
-// 처음엔 "건물당 한 행 + tags(jsonb 배열)"로 설계했는데, 실제 기존 테이블은 태그 1개당 1행
-// (tenant_id/kind/name 모두 NOT NULL, sort_order로 순서 유지) 구조였다. 그래서 이 테이블만은
-// entryToRowFor/rowToEntryFor 공용 경로를 안 타고, storageGet/supabaseWrite에서 바로 분기 처리한다.
-function tagSetQueryParams(key){
-  const isOther = key === 'photo_other_tag_list';
-  const building = isOther ? null : key.slice('photo_tag_list:'.length);
-  const buildingId = building ? (_buildingIdByName[building] || null) : null;
-  return { buildingId, kind: isOther ? 'other' : 'report' };
-}
-async function writeTagSetList(key, list){
-  const { buildingId, kind } = tagSetQueryParams(key);
-  let delQ = 'tag_sets?tenant_id=eq.' + encodeURIComponent(CURRENT_TENANT_CODE) + '&kind=eq.' + encodeURIComponent(kind);
-  delQ += buildingId ? ('&building_id=eq.' + encodeURIComponent(buildingId)) : '&building_id=is.null';
-  await sbFetch(delQ, { method:'DELETE' }); // 목록 전체를 통째로 다시 쓰는 앱 동작에 맞춰 지우고 다시 채움
-  const names = Array.isArray(list) ? list : [];
-  if(names.length){
-    const rows = names.map((name, i)=>({ tenant_id: CURRENT_TENANT_CODE, building_id: buildingId, kind, name, sort_order: i }));
-    await sbFetch('tag_sets', { method:'POST', headers:{ 'Prefer':'return=minimal' }, body: JSON.stringify(rows) });
-  }
-}
-async function readTagSetList(key){
-  const { buildingId, kind } = tagSetQueryParams(key);
-  let q = 'tag_sets?select=name&kind=eq.' + encodeURIComponent(kind)
-    + '&tenant_id=eq.' + encodeURIComponent(CURRENT_TENANT_CODE) + '&order=sort_order.asc';
-  q += buildingId ? ('&building_id=eq.' + encodeURIComponent(buildingId)) : '&building_id=is.null';
-  const rows = await sbFetch(q);
-  return (rows||[]).map(r=>r.name);
-}
-
-// ---- [V68/C단계 → V71 수정] building_facility_edits (소방시설현황수정)
-// 이미 있던 테이블의 컬럼이 'edits'가 아니라 'data'(NOT NULL, 기본값 '{}')였음 — 거기 맞춤.
-function buildingFacilityEditRowToEntry(row){ return row.data || {}; }
-async function entryToBuildingFacilityEditRow(entry, key){
-  const building = key.slice('building_edits:'.length);
-  return {
-    legacy_id: tenantScopedLegacyId(building), // 다른 테넌트에 동명 건물 있어도 안 겹치게
-    tenant_id: CURRENT_TENANT_CODE,
-    building_id: await resolveBuildingId(building),
-    data: entry
-  };
-}
-
-// ---- [V68/C단계 → V71 수정] building_edit_history (수정이력)
-// 이미 있던 테이블이 통짜 JSONB가 아니라 tab/tab_label/changes(NOT NULL)로 나뉜 구조였음 — 거기 맞춤.
-// (원본 entry 전체도 참고용으로 같이 넣어두되, 필수 컬럼은 반드시 채워서 NOT NULL 위반을 막는다)
-function buildingEditHistoryRowToEntry(row){
-  return {
-    building: _buildingNameById[row.building_id] || null,
-    tab: row.tab || null, tabLabel: row.tab_label || null,
-    changes: row.changes || [],
-    ts: row.ts != null ? row.ts : (row.created_at ? new Date(row.created_at).getTime() : Date.now()),
-    inspector: ''
-  };
-}
-async function entryToBuildingEditHistoryRow(entry, key){
-  return {
-    legacy_id: legacyIdFromKey(key), // 'building_history:<건물>:<ts>' → '<건물>:<ts>' (유일함)
-    tenant_id: CURRENT_TENANT_CODE,
-    building_id: await resolveBuildingId(entry.building),
-    tab: entry.tab || null,
-    tab_label: entry.tabLabel || null,
-    changes: entry.changes || [], // NOT NULL 컬럼 — 값 없으면 빈 배열로라도 채움
-    ts: entry.ts || null
-  };
 }
 
 // 오프라인 큐가 재전송할 때도 쓰는 공통 디스패처(성공하면 true 계열 값, 실패하면 null)
@@ -1450,20 +1200,16 @@ async function supabaseWrite(payload){
     await ensureSupabaseCaches();
     if(payload.action === 'set'){
       let entry; try{ entry = JSON.parse(payload.value); }catch(e){ return null; }
-      if(table === 'tag_sets'){
-        await writeTagSetList(payload.key, entry); // 태그 1개당 1행 구조라 통째 지우고 다시 씀
-      } else {
-        const row = await entryToRowFor(table, entry, payload.key);
-        await sbFetch(table + '?on_conflict=legacy_id', {
-          method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-          body: JSON.stringify([row])
-        });
-      }
+      const row = entryToRowFor(table, entry);
+      await sbFetch(table + '?on_conflict=legacy_id', {
+        method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([row])
+      });
     } else if(payload.action === 'delete'){
-      await sbFetch(table + '?legacy_id=eq.' + encodeURIComponent(legacyIdFromKey(payload.key)) + '&tenant_id=eq.' + encodeURIComponent(CURRENT_TENANT_CODE), { method:'DELETE' });
+      await sbFetch(table + '?legacy_id=eq.' + encodeURIComponent(legacyIdFromKey(payload.key)), { method:'DELETE' });
     } else if(payload.action === 'deleteMany'){
       const ids = (payload.keys||[]).map(legacyIdFromKey);
-      if(ids.length) await sbFetch(table + '?legacy_id=in.(' + ids.map(encodeURIComponent).join(',') + ')&tenant_id=eq.' + encodeURIComponent(CURRENT_TENANT_CODE), { method:'DELETE' });
+      if(ids.length) await sbFetch(table + '?legacy_id=in.(' + ids.map(encodeURIComponent).join(',') + ')', { method:'DELETE' });
     } else {
       return null;
     }
@@ -1476,30 +1222,12 @@ async function supabaseWrite(payload){
   }
 }
 
-// [V73/F단계] 'ui_prefs'처럼 모든 테넌트가 같은 key를 쓰는 경우, DB legacy_id는
-// 테넌트별로 구분되게 접두어를 붙인다(안 그러면 나중 테넌트가 이전 테넌트 값을 덮어씀).
-function tenantScopedLegacyId(base){ return CURRENT_TENANT_CODE + ':' + base; }
-function resolveLegacyIdForRead(table, key){
-  if(table === 'ui_prefs') return tenantScopedLegacyId('ui_prefs');
-  if(table === 'building_facility_edits') return tenantScopedLegacyId(key.slice('building_edits:'.length));
-  return legacyIdFromKey(key);
-}
-
 async function storageGet(key, shared){
   const table = supabaseTableFor(key);
   if(table){
     await ensureSupabaseCaches();
     try{
-      if(table === 'tag_sets'){
-        const list = await readTagSetList(key);
-        // [V74 버그수정] 저장된 태그가 하나도 없으면 null을 돌려줘야
-        // 호출부(loadTags 등)가 "값 없음"으로 보고 대상물 맞춤 기본 태그 계산으로 넘어간다.
-        // 빈 배열을 그대로 돌려주면 "빈 목록이 저장되어 있음"으로 오인해 기본 태그가 안 뜬다.
-        if(!list.length) return null;
-        return { value: JSON.stringify(list) };
-      }
-      const rows = await sbFetch(table + '?legacy_id=eq.' + encodeURIComponent(resolveLegacyIdForRead(table, key))
-        + '&tenant_id=eq.' + encodeURIComponent(CURRENT_TENANT_CODE) + '&select=*');
+      const rows = await sbFetch(table + '?legacy_id=eq.' + encodeURIComponent(legacyIdFromKey(key)) + '&select=*');
       if(rows && rows.length) return { value: JSON.stringify(rowToEntryFor(table, rows[0])) };
       return null;
     }catch(e){ console.error('Supabase 조회 실패', e); return null; }
@@ -1553,7 +1281,7 @@ async function storageList(prefix, shared){
   if(table){
     await ensureSupabaseCaches();
     try{
-      const rows = await sbFetch(table + '?select=legacy_id&tenant_id=eq.' + encodeURIComponent(CURRENT_TENANT_CODE));
+      const rows = await sbFetch(table + '?select=legacy_id');
       const p = prefix.split(':')[0] + ':';
       return { keys: (rows||[]).map(r=>p+r.legacy_id) };
     }catch(e){ console.error('Supabase 목록조회 실패', e); return { keys: [] }; }
@@ -1567,17 +1295,7 @@ async function storageGetMany(prefix, shared){
   if(table){
     await ensureSupabaseCaches();
     try{
-      // [V73/F단계] 이 테이블들은 여러 테넌트 데이터가 한 테이블에 같이 들어있으므로
-      // 항상 현재 테넌트로 필터링한다(예전엔 이게 빠져있어서 목록을 통째로 가져오고 있었음).
-      let query = table + '?select=*&tenant_id=eq.' + encodeURIComponent(CURRENT_TENANT_CODE);
-      // [V68/C단계] building_edit_history는 한 테이블에 모든 대상물 이력이 섞여있으므로,
-      // prefix('building_history:<건물>:')에서 건물명을 뽑아 그 건물만 필터링해서 가져온다.
-      if(table === 'building_edit_history' && prefix.indexOf('building_history:') === 0){
-        const building = prefix.slice('building_history:'.length, -1);
-        const bId = _buildingIdByName[building];
-        query += '&building_id=eq.' + encodeURIComponent(bId || '00000000-0000-0000-0000-000000000000');
-      }
-      const rows = await sbFetch(query);
+      const rows = await sbFetch(table + '?select=*');
       backendOnline = true; updateSyncBanner();
       return (rows||[]).map(r=>rowToEntryFor(table, r));
     }catch(e){
@@ -4141,7 +3859,6 @@ function buildEntriesFromXlsxRows(rows){
       detailLocation,
       equip: chip || '(설비명 미상)',
       defectContent,
-      equipName: chip || null, equipSub: null, // [V69/D단계] 엑셀 일괄등록은 세부항목까지는 안 갈라내므로 이름만
       parentEquip: null,
       // 보완대책 문구("~완료"라고 명시된 경우만 조치완료, 그 외(대부분의 "~요함" 문구)는 조치요함)
       action: /완료/.test(r.action||'') ? '조치완료' : '조치요함',
@@ -4351,14 +4068,7 @@ $('editSaveBtn').onclick = async ()=>{
   const floor = $('editFloor').value;
   entry.location = (wing ? wing+' ' : '') + floor;
   entry.detailLocation = $('editDetailLocation').value.trim();
-  const newEquip = $('editEquip').value.trim() || entry.equip;
-  if(newEquip !== entry.equip){
-    // [V69/D단계] 자유 텍스트 칸에서 설비명을 직접 고쳤다면, 저장돼 있던 equipName/equipSub/parentEquip
-    // (설비 ID 매칭용)은 더는 이 문자열과 안 맞을 수 있으니 비워서 잘못된 ID가 남지 않게 한다.
-    // (다시 매칭하려면 새로 등록하듯 설비명 칩에서 골라야 함 — 자유 텍스트만으론 정확한 매칭이 어려움)
-    entry.equipName = null; entry.equipSub = null; entry.parentEquip = null;
-  }
-  entry.equip = newEquip;
+  entry.equip = $('editEquip').value.trim() || entry.equip;
   entry.defectContent = $('editDefectContent').value.trim();
   entry.action = entry._editAction || entry.action;
   if(entry._editPhoto) entry.photo = entry._editPhoto;
@@ -4392,11 +4102,6 @@ $('defectSaveBtn').onclick = async ()=>{
     location,
     detailLocation: $('detailLocation').value.trim(),
     equip, defectContent,
-    // [V69/D단계] 화면엔 하나로 합쳐 보여주지만(equip), 나중에 설비 ID와 정확히 매칭하려면
-    // 이름과 세부항목을 따로 알고 있어야 한다("옥내소화전 소화전함"을 다시 쪼개는 건 애매함이 생김).
-    // eff.name/eff.sub는 이미 화면에서 따로 선택된 값이라 그대로 별도 필드로 저장해둔다.
-    equipName: eff.name || null,
-    equipSub: eff.sub || null,
     parentEquip: eff.parent || null,  // 옥내소화전/스프링클러 밑에서 고른 공용 펌프류일 때, 어느 쪽 소속인지 (엑셀 출력 시 NFTC 102/103 직접 결정용)
     action: defectState.action,
     photo: defectState.photo,
